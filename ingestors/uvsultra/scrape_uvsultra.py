@@ -156,24 +156,39 @@ def scrape_list(config: Dict[str, Any], session: requests.Session) -> List[str]:
     base_url = config["base_url"].rstrip("/")
     url = config["list_url"]
     link_sel = config["card_link_selector"]
-    next_sel = config.get("pagination_selector")
     delay = float(config.get("rate_limit_seconds", 0.6))
 
     seen = set()
     card_urls: List[str] = []
 
-    while url:
-        soup = fetch_html(url, session, delay)
-        new_urls = discover_card_links_from_listing(soup, base_url, link_sel)
-        for href in new_urls:
+    # First page via GET
+    soup = fetch_html(url, session, delay)
+    new_urls = discover_card_links_from_listing(soup, base_url, link_sel)
+    for href in new_urls:
+        if href not in seen:
+            seen.add(href)
+            card_urls.append(href)
+
+    # Subsequent pages via POST with page=2..N and js=1 until empty
+    page = 2
+    while True:
+        resp = session.post(url, data={"page": str(page), "js": "1"}, timeout=30)
+        if resp.status_code != 200:
+            break
+        time.sleep(delay)
+        page_soup = BeautifulSoup(resp.text, "lxml")
+        page_urls = discover_card_links_from_listing(page_soup, base_url, link_sel)
+        if not page_urls:
+            break
+        added = 0
+        for href in page_urls:
             if href not in seen:
                 seen.add(href)
                 card_urls.append(href)
-        next_url = find_next_page(soup, base_url, next_sel)
-        url = next_url
-        # For safety in dry runs: break after first page if no pagination
-        if not next_url:
+                added += 1
+        if added == 0:
             break
+        page += 1
     return card_urls
 
 
@@ -183,47 +198,43 @@ def parse_detail_fields(soup: BeautifulSoup) -> Dict[str, Optional[str]]:
     set_name = None
     number = None
     division = soup.select_one("div.card_division.cd1")
+    type_ = None
+    rarity = None
     if division:
-        # Set name inside <a>
+        # Set name inside first <a> before '#'
         a = division.select_one("a")
         if a:
             set_name = a.get_text(strip=True)
-        # Number appears like '#123' in the same span text
-        span = division.select_one("span")
-        if span:
-            m = re.search(r"#\s*(\w+)", span.get_text(" ", strip=True))
-            if m:
-                number = m.group(1)
-        # Type and Rarity often appear as subsequent lines under division
-        # Collect stripped strings and find unique tokens excluding the first 'Set ...'
-        strings = [s.strip() for s in division.stripped_strings]
-        # strings pattern example: ['Set 66 -', 'Teenage Mutant Ninja Turtles', '#1', 'Character', 'Common', 'Legacy']
-        type_ = None
-        rarity = None
-        # Find tokens that match known categories
-        for tok in strings:
+        # Number appears like '#123' in the same area
+        text_block = division.get_text(" ", strip=True)
+        m_num = re.search(r"#\s*(\w+)", text_block)
+        if m_num:
+            number = m_num.group(1)
+        # Type and Rarity on detail page appear as individual lines after the set line
+        # Gather all stripped strings and look for known types/rarities
+        tokens = [s.strip() for s in division.stripped_strings]
+        for tok in tokens:
             if tok in ("Character", "Action", "Asset", "Attack", "Foundation") and not type_:
                 type_ = tok
-            if tok in ("Common", "Uncommon", "Rare", "Ultra Rare", "Promo") and not rarity:
+            if tok in ("Common", "Uncommon", "Rare", "Ultra Rare", "Promo", "Starter", "Secret Rare") and not rarity:
                 rarity = tok
-    else:
-        type_ = None
-        rarity = None
 
-    # Fallback: type/rarity may also be in .card-important-info
     if not (type_ and rarity):
         info = soup.select_one(".card-important-info")
         if info:
             s = info.get_text(" ", strip=True)
-            # Expect like: 'Character Common'
             parts = s.split()
             if len(parts) >= 1 and not type_:
                 type_ = parts[0]
             if len(parts) >= 2 and not rarity:
                 rarity = parts[-1]
 
-    # Image on detail page
     image_url = select_text(soup, "img.preview_image::attr(src)")
+    # Rules text block, if present
+    text = None
+    text_node = soup.select_one("div.card_text, div.card_rules, div.card-description")
+    if text_node:
+        text = text_node.get_text("\n", strip=True)
 
     return {
         "name": name,
@@ -232,6 +243,7 @@ def parse_detail_fields(soup: BeautifulSoup) -> Dict[str, Optional[str]]:
         "type": type_ or "Card",
         "rarity": rarity,
         "image_url": image_url,
+        "text": text,
     }
 
 
@@ -249,18 +261,17 @@ def scrape_card(url: str, config: Dict[str, Any], session: requests.Session) -> 
     type_ = fields.get("type") or "Card"
     rarity = fields.get("rarity")
     image_url = fields.get("image_url")
+    text = fields.get("text")
 
     # Unknown in this layout; leave None
     cost = None
     attack = None
     health = None
 
-    text = select_text(soup, "div.card_text")
     keywords = extract_keywords(text)
 
     card_id = normalize_id(None, number, name)
 
-    # Build absolute image URL if relative
     if image_url:
         image_url = absolutize(config["base_url"], image_url)
 
