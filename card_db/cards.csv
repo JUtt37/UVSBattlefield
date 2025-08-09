@@ -1,0 +1,4 @@
+id,name,type,rarity,cost,attack,health,keywords,text,set_code,set_name,number,image_url
+alpha_001,Daring Wolf,Creature,Common,2,3,2,"Charge","Charge (can act the turn it's played).",ALP,Alpha Set,1,
+alpha_002,Stonewall Guardian,Creature,Uncommon,3,2,4,"Taunt","Enemies must target this first.",ALP,Alpha Set,2,
+alpha_003,Arcane Bolt,Spell,Common,1,,,"","Deal 2 damage to any target.",ALP,Alpha Set,3,
