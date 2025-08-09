@@ -33,7 +33,7 @@ def discover_set_map(max_pages: int = 20, delay: float = 0.25) -> dict[str,str]:
         for card in soup.select('.card'):
             img = card.select_one('img.mini_image')
             if not img or not img.get('src'): continue
-            m = re.search(r'/images/extensions/([^/]+)/', img['src'])
+            m = re.search(r'images/extensions/([^/]+)/', img['src'])
             if not m: continue
             code = m.group(1)
             # Anchor with set name is inside card_division
