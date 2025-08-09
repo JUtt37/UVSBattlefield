@@ -1,0 +1,23 @@
+# Base configuration for UVS Ultra scraping (example; update to live HTML)
+base_url: https://www.uvsultra.online
+list_url: https://www.uvsultra.online/cards
+card_link_selector: 'a.card-link'
+pagination_selector: 'a.next'
+rate_limit_seconds: 0.6
+
+selectors:
+  name: 'h1.card-title'
+  type: 'div.card-type'
+  rarity: 'div.card-rarity'
+  cost: 'span.cost'
+  attack: 'span.attack'
+  health: 'span.health'
+  text: 'div.card-text'
+  set_code: 'span.set-code'
+  set_name: 'span.set-name'
+  number: 'span.card-number'
+  image_url: 'img.card-image::attr(src)'
+
+# CSS attribute extraction syntax:
+# - For text content: 'div.selector'
+# - For attribute: 'img.selector::attr(src)'
