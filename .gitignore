@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.pyc
+
+# Local env
+.venv/
+
+# Logs
+*.log
+ingestors/uvsultra/ingest.log
+
+# Generated data (re-add later after completion if desired)
+card_db/cards.json
+assets/images/cards/
