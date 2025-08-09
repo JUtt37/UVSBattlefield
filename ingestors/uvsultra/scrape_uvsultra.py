@@ -103,7 +103,6 @@ def normalize_id(set_code: Optional[str], number: Optional[str], name: str) -> s
 def extract_keywords(text: Optional[str]) -> List[str]:
     if not text:
         return []
-    # Naive example: split on semicolons or detect Capitalized Keywords in parentheses
     keywords = []
     for token in re.split(r"[;,.]", text):
         token = token.strip()
@@ -112,6 +111,45 @@ def extract_keywords(text: Optional[str]) -> List[str]:
         if re.match(r"^[A-Z][A-Za-z\- ]{2,}$", token):
             keywords.append(token)
     return list(dict.fromkeys(keywords))
+
+
+def absolutize(base_url: str, href: str) -> str:
+    if href.startswith("http"):
+        return href
+    if href.startswith("/"):
+        return f"{base_url.rstrip('/')}{href}"
+    return f"{base_url.rstrip('/')}/{href}"
+
+
+def discover_card_links_from_listing(soup: BeautifulSoup, base_url: str, link_selector: str) -> List[str]:
+    urls: List[str] = []
+    for node in soup.select(link_selector):
+        href = None
+        if node.name == "a":
+            href = node.get("href")
+        if not href:
+            onclick = node.get("onclick")
+            if onclick:
+                m = re.search(r"card\.php\?id=(\d+)", onclick)
+                if m:
+                    href = f"card.php?id={m.group(1)}"
+        if href:
+            urls.append(absolutize(base_url, href))
+    return urls
+
+
+def find_next_page(soup: BeautifulSoup, base_url: str, pagination_selector: Optional[str]) -> Optional[str]:
+    if not pagination_selector:
+        return None
+    # Prefer the link with rel=next or the last pagination a after current
+    for a in soup.select(f"{pagination_selector}"):
+        href = a.get("href")
+        if not href:
+            continue
+        # Heuristic: the next page likely contains listing_cards.php with an offset param
+        if "listing_cards.php" in href:
+            return absolutize(base_url, href)
+    return None
 
 
 def scrape_list(config: Dict[str, Any], session: requests.Session) -> List[str]:
@@ -126,48 +164,105 @@ def scrape_list(config: Dict[str, Any], session: requests.Session) -> List[str]:
 
     while url:
         soup = fetch_html(url, session, delay)
-        for a in soup.select(link_sel):
-            href = a.get("href")
-            if not href:
-                continue
-            if href.startswith("/"):
-                href = f"{base_url}{href}"
-            if href.startswith(base_url) and href not in seen:
+        new_urls = discover_card_links_from_listing(soup, base_url, link_sel)
+        for href in new_urls:
+            if href not in seen:
                 seen.add(href)
                 card_urls.append(href)
-        if next_sel:
-            next_node = soup.select_one(next_sel)
-            if next_node and next_node.get("href"):
-                href = next_node.get("href")
-                url = href if href.startswith("http") else f"{base_url}{href}"
-            else:
-                url = None
-        else:
-            url = None
+        next_url = find_next_page(soup, base_url, next_sel)
+        url = next_url
+        # For safety in dry runs: break after first page if no pagination
+        if not next_url:
+            break
     return card_urls
+
+
+def parse_detail_fields(soup: BeautifulSoup) -> Dict[str, Optional[str]]:
+    # Basic fields from detail layout
+    name = select_text(soup, "div.card_title h1")
+    set_name = None
+    number = None
+    division = soup.select_one("div.card_division.cd1")
+    if division:
+        # Set name inside <a>
+        a = division.select_one("a")
+        if a:
+            set_name = a.get_text(strip=True)
+        # Number appears like '#123' in the same span text
+        span = division.select_one("span")
+        if span:
+            m = re.search(r"#\s*(\w+)", span.get_text(" ", strip=True))
+            if m:
+                number = m.group(1)
+        # Type and Rarity often appear as subsequent lines under division
+        # Collect stripped strings and find unique tokens excluding the first 'Set ...'
+        strings = [s.strip() for s in division.stripped_strings]
+        # strings pattern example: ['Set 66 -', 'Teenage Mutant Ninja Turtles', '#1', 'Character', 'Common', 'Legacy']
+        type_ = None
+        rarity = None
+        # Find tokens that match known categories
+        for tok in strings:
+            if tok in ("Character", "Action", "Asset", "Attack", "Foundation") and not type_:
+                type_ = tok
+            if tok in ("Common", "Uncommon", "Rare", "Ultra Rare", "Promo") and not rarity:
+                rarity = tok
+    else:
+        type_ = None
+        rarity = None
+
+    # Fallback: type/rarity may also be in .card-important-info
+    if not (type_ and rarity):
+        info = soup.select_one(".card-important-info")
+        if info:
+            s = info.get_text(" ", strip=True)
+            # Expect like: 'Character Common'
+            parts = s.split()
+            if len(parts) >= 1 and not type_:
+                type_ = parts[0]
+            if len(parts) >= 2 and not rarity:
+                rarity = parts[-1]
+
+    # Image on detail page
+    image_url = select_text(soup, "img.preview_image::attr(src)")
+
+    return {
+        "name": name,
+        "set_name": set_name,
+        "number": number,
+        "type": type_ or "Card",
+        "rarity": rarity,
+        "image_url": image_url,
+    }
 
 
 def scrape_card(url: str, config: Dict[str, Any], session: requests.Session) -> Optional[Card]:
     delay = float(config.get("rate_limit_seconds", 0.6))
     soup = fetch_html(url, session, delay)
-    sel = config["selectors"]
 
-    name = select_text(soup, sel.get("name")) or ""
+    fields = parse_detail_fields(soup)
+    name = fields["name"] or ""
     if not name:
         return None
-    type_ = select_text(soup, sel.get("type")) or "Card"
-    rarity = select_text(soup, sel.get("rarity"))
-    cost = parse_int(select_text(soup, sel.get("cost")))
-    attack = parse_int(select_text(soup, sel.get("attack")))
-    health = parse_int(select_text(soup, sel.get("health")))
-    text = select_text(soup, sel.get("text"))
-    set_code = select_text(soup, sel.get("set_code"))
-    set_name = select_text(soup, sel.get("set_name"))
-    number = select_text(soup, sel.get("number"))
-    image_url = select_text(soup, sel.get("image_url"))
 
+    set_name = fields.get("set_name")
+    number = fields.get("number")
+    type_ = fields.get("type") or "Card"
+    rarity = fields.get("rarity")
+    image_url = fields.get("image_url")
+
+    # Unknown in this layout; leave None
+    cost = None
+    attack = None
+    health = None
+
+    text = select_text(soup, "div.card_text")
     keywords = extract_keywords(text)
-    card_id = normalize_id(set_code, number, name)
+
+    card_id = normalize_id(None, number, name)
+
+    # Build absolute image URL if relative
+    if image_url:
+        image_url = absolutize(config["base_url"], image_url)
 
     return Card(
         id=card_id,
@@ -179,7 +274,7 @@ def scrape_card(url: str, config: Dict[str, Any], session: requests.Session) -> 
         health=health,
         keywords=keywords,
         text=text,
-        set_code=set_code,
+        set_code=None,
         set_name=set_name,
         number=number,
         image_url=image_url,
