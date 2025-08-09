@@ -8,6 +8,7 @@ import time
 import random
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 
 import requests
 import yaml
@@ -219,6 +220,7 @@ def parse_detail_fields(soup: BeautifulSoup) -> Dict[str, Optional[str]]:
     name = select_text(soup, "div.card_title h1")
     set_name = None
     number = None
+    set_code = None
     division = soup.select_one("div.card_division.cd1")
     type_ = None
     rarity = None
@@ -237,17 +239,13 @@ def parse_detail_fields(soup: BeautifulSoup) -> Dict[str, Optional[str]]:
             if tok in ("Common", "Uncommon", "Rare", "Ultra Rare", "Promo", "Starter", "Secret Rare") and not rarity:
                 rarity = tok
 
-    if not (type_ and rarity):
-        info = soup.select_one(".card-important-info")
-        if info:
-            s = info.get_text(" ", strip=True)
-            parts = s.split()
-            if len(parts) >= 1 and not type_:
-                type_ = parts[0]
-            if len(parts) >= 2 and not rarity:
-                rarity = parts[-1]
-
     image_url = select_text(soup, "img.preview_image::attr(src)")
+    # Derive set_code from the image URL path: images/extensions/<set_code>/...
+    if image_url:
+        m_sc = re.search(r"/images/extensions/([^/]+)/", image_url)
+        if m_sc:
+            set_code = m_sc.group(1)
+
     text = None
     text_node = soup.select_one("div.card_text, div.card_rules, div.card-description")
     if text_node:
@@ -256,6 +254,7 @@ def parse_detail_fields(soup: BeautifulSoup) -> Dict[str, Optional[str]]:
     return {
         "name": name,
         "set_name": set_name,
+        "set_code": set_code,
         "number": number,
         "type": type_ or "Card",
         "rarity": rarity,
@@ -274,6 +273,7 @@ def scrape_card(url: str, config: Dict[str, Any], session: requests.Session) -> 
         return None
 
     set_name = fields.get("set_name")
+    set_code = fields.get("set_code")
     number = fields.get("number")
     type_ = fields.get("type") or "Card"
     rarity = fields.get("rarity")
@@ -286,7 +286,7 @@ def scrape_card(url: str, config: Dict[str, Any], session: requests.Session) -> 
 
     keywords = extract_keywords(text)
 
-    card_id = normalize_id(None, number, name)
+    card_id = normalize_id(set_code, number, name)
 
     if image_url:
         image_url = absolutize(config["base_url"], image_url)
@@ -301,7 +301,7 @@ def scrape_card(url: str, config: Dict[str, Any], session: requests.Session) -> 
         health=health,
         keywords=keywords,
         text=text,
-        set_code=None,
+        set_code=set_code,
         set_name=set_name,
         number=number,
         image_url=image_url,
@@ -314,10 +314,14 @@ def ensure_dir(path: str) -> None:
     os.makedirs(path, exist_ok=True)
 
 
-def download_image(url: str, out_dir: str, session: requests.Session, rate_limit_seconds: float) -> Optional[str]:
+def download_image(url: str, out_dir: str, session: requests.Session, rate_limit_seconds: float, preferred_basename: Optional[str] = None) -> Optional[str]:
     try:
         ensure_dir(out_dir)
-        filename = re.sub(r"[^a-zA-Z0-9._-]", "_", url.split("/")[-1]) or "card.jpg"
+        parsed = urlparse(url)
+        last = os.path.basename(parsed.path)
+        # drop query suffix like ?20240802 and sanitize
+        base = re.sub(r"[^a-zA-Z0-9._-]", "_", last)
+        filename = preferred_basename if preferred_basename else base
         out_path = os.path.join(out_dir, filename)
         if not os.path.exists(out_path):
             resp = request_with_backoff("GET", url, session, rate_limit_seconds)
@@ -358,7 +362,14 @@ def main() -> int:
         if not card:
             continue
         if args.download_images and card.image_url:
-            local_path = download_image(card.image_url, args.images_dir or "assets/images/cards", session, float(config.get("rate_limit_seconds", 0.6)))
+            preferred = None
+            # build unique filename using set_code and number if available
+            if card.set_code or card.number:
+                parsed = urlparse(card.image_url)
+                last = os.path.basename(parsed.path)
+                last = re.sub(r"[^a-zA-Z0-9._-]", "_", last)
+                preferred = f"{(card.set_code or 'set')}_{(card.number or 'na')}_{last}"
+            local_path = download_image(card.image_url, args.images_dir or "assets/images/cards", session, float(config.get("rate_limit_seconds", 0.6)), preferred_basename=preferred)
             if local_path:
                 card.image_url = local_path
         cards.append(card.to_normalized())
