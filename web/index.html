@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>UVS Card Browser</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <header>
+    <h1>UVS Card Browser</h1>
+    <div class="controls">
+      <input id="search" type="search" placeholder="Search name or text..." />
+      <select id="typeFilter"><option value="">All Types</option></select>
+      <select id="rarityFilter"><option value="">All Rarities</option></select>
+      <select id="setFilter"><option value="">All Sets</option></select>
+      <span id="count">0</span>
+    </div>
+  </header>
+
+  <main>
+    <div id="grid" class="grid"></div>
+  </main>
+
+  <template id="cardTpl">
+    <div class="card">
+      <div class="imgWrap"><img loading="lazy" /></div>
+      <div class="meta">
+        <div class="name"></div>
+        <div class="sub"></div>
+      </div>
+    </div>
+  </template>
+
+  <script src="./app.js"></script>
+</body>
+</html>
