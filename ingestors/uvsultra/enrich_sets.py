@@ -47,7 +47,7 @@ def discover_listing(session: requests.Session, page: int) -> List[str]:
   return urls
 
 
-def parse_detail(session: requests.Session, url: str, delay: float) -> Optional[Tuple[str, Optional[str], Optional[str]]]:
+def parse_detail(session: requests.Session, url: str, delay: float) -> Optional[Tuple[str, Optional[str], Optional[str], Optional[str]]]:
   resp = request_with_backoff(session, 'GET', url, delay=delay)
   soup = BeautifulSoup(resp.text, 'lxml')
   name = soup.select_one('div.card_title h1')
@@ -58,7 +58,6 @@ def parse_detail(session: requests.Session, url: str, delay: float) -> Optional[
   set_name = None
   set_code = None
   if division:
-    # Card number
     m = re.search(r"#\s*(\w+)", division.get_text(' ', strip=True))
     if m: number = m.group(1)
     a = division.select_one('a[href*="extension_pdf.php"]')
@@ -76,12 +75,12 @@ def main() -> int:
   parser.add_argument('--docs-cards', default='/workspace/docs/cards.json')
   parser.add_argument('--max-pages', type=int, default=None)
   parser.add_argument('--delay', type=float, default=0.25)
+  parser.add_argument('--save-interval', type=int, default=200)
   args = parser.parse_args()
 
   with open(args.cards, 'r', encoding='utf-8') as f:
     cards: List[Dict[str, Any]] = json.load(f)
 
-  # Build index by (name.lower(), number) for matching
   key_to_idx: Dict[Tuple[str, Optional[str]], int] = {}
   for i, c in enumerate(cards):
     name = (c.get('name') or '').strip().lower()
@@ -121,6 +120,17 @@ def main() -> int:
       if changed:
         cards[idx]['set'] = s
         updated += 1
+        if updated % args.save_interval == 0:
+          with open(args.cards, 'w', encoding='utf-8') as f:
+            json.dump(cards, f, ensure_ascii=False, indent=2)
+          try:
+            if os.path.exists(args.docs_cards):
+              with open(args.docs_cards, 'w', encoding='utf-8') as f:
+                json.dump(cards, f, ensure_ascii=False, indent=2)
+          except Exception:
+            pass
+          print(f'incremental_save updated={updated} seen={total_seen} page={page}')
+    print(f'page_done page={page} seen_total={total_seen} updated_total={updated}')
     page += 1
 
   if updated:
