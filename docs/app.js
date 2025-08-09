@@ -73,6 +73,12 @@ function renderCards(cards){
   document.getElementById('count').textContent = `${cards.length} cards`;
 }
 
+function hasImage(c){
+  const url = c.image && c.image.url;
+  if(url && url.startsWith('http')) return true;
+  return !!remoteImageUrl(c);
+}
+
 (async function(){
   const all = await loadCards();
   renderFilters(all);
@@ -80,14 +86,15 @@ function renderCards(cards){
   const typeSel = document.getElementById('typeFilter');
   const raritySel = document.getElementById('rarityFilter');
   const setSel = document.getElementById('setFilter');
+  const imagesOnly = document.getElementById('imagesOnly');
 
   function update(){
     const q = search.value.trim().toLowerCase();
     const filters = { type: typeSel.value, rarity: raritySel.value, set: setSel.value };
-    const filtered = all.filter(c => cardMatches(c, q, filters));
+    const filtered = all.filter(c => cardMatches(c, q, filters)).filter(c => !imagesOnly.checked || hasImage(c));
     renderCards(filtered);
   }
 
-  [search, typeSel, raritySel, setSel].forEach(el => el.addEventListener('input', update));
+  [search, typeSel, raritySel, setSel, imagesOnly].forEach(el => el.addEventListener('input', update));
   update();
 })();
