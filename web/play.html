@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Playtest</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div class="page">
+    <div class="toolbar">
+      <a class="btn" href="./index.html">← Card Browser</a>
+      <a class="btn" href="./deck.html">Deck Builder</a>
+      <button id="drawP1" class="btn">Draw P1</button>
+      <button id="drawP2" class="btn">Draw P2</button>
+    </div>
+    <div class="play-area">
+      <div class="panel">
+        <h3>Board</h3>
+        <div id="board" class="slot"></div>
+      </div>
+      <div>
+        <div class="panel"><h3>Player 1 Hand</h3><div id="hand1" class="list"></div></div>
+        <div class="panel"><h3>Player 2 Hand</h3><div id="hand2" class="list"></div></div>
+      </div>
+    </div>
+  </div>
+  <script src="./play.js"></script>
+</body>
+</html>

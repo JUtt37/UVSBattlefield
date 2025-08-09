@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Deck Builder</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div class="page">
+    <div class="toolbar">
+      <a class="btn" href="./index.html">← Card Browser</a>
+      <input id="search" type="search" placeholder="Search..." />
+      <select id="typeFilter"><option value="">All Types</option></select>
+      <select id="setFilter"><option value="">All Sets</option></select>
+      <span id="deckCount">0</span>
+      <a class="btn" id="exportDeck" href="#">Export JSON</a>
+    </div>
+    <div class="columns">
+      <div class="panel">
+        <div id="results" class="list"></div>
+      </div>
+      <div class="panel">
+        <h3>Deck</h3>
+        <div id="deck" class="list"></div>
+      </div>
+    </div>
+  </div>
+  <script src="./deck.js"></script>
+</body>
+</html>
