@@ -171,7 +171,18 @@ def scrape_list(config: Dict[str, Any], session: requests.Session) -> List[str]:
 
     # Subsequent pages via POST with page=2..N and js=1 until empty
     page = 2
+    max_pages = None
+    # If caller provided max pages through argparse, capture it via env var handoff
+    try:
+        # The main() function will set an env var to pass max-pages into this function
+        from os import getenv
+        mp = getenv("UVS_MAX_PAGES")
+        max_pages = int(mp) if mp else None
+    except Exception:
+        max_pages = None
     while True:
+        if max_pages is not None and page > max_pages:
+            break
         resp = session.post(url, data={"page": str(page), "js": "1"}, timeout=30)
         if resp.status_code != 200:
             break
@@ -321,6 +332,7 @@ def main() -> int:
     parser.add_argument("--images-dir", default=None)
     parser.add_argument("--download-images", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--max-pages", type=int, default=None)
     args = parser.parse_args()
 
     config = load_yaml(args.config)
@@ -330,6 +342,10 @@ def main() -> int:
         "User-Agent": "CardIngestor/1.0 (+practice; permission granted)",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     })
+
+    # Pass max-pages into scraper via env var for simplicity
+    if args.max_pages is not None:
+        os.environ["UVS_MAX_PAGES"] = str(args.max_pages)
 
     card_urls = scrape_list(config, session)
 
