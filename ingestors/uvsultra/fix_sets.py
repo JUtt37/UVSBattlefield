@@ -40,7 +40,7 @@ def discover_set_map(max_pages: int = 20, delay: float = 0.25) -> dict[str,str]:
             div = card.select_one('.card_division')
             set_name = None
             if div:
-                a = div.select_one('a')
+                a = div.select_one('a[href*="extension_pdf.php"]')
                 if a and a.get_text(strip=True):
                     set_name = a.get_text(strip=True)
             if set_name and code not in mapping:

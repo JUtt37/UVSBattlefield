@@ -225,7 +225,8 @@ def parse_detail_fields(soup: BeautifulSoup) -> Dict[str, Optional[str]]:
     type_ = None
     rarity = None
     if division:
-        a = division.select_one("a")
+        # Prefer the extension PDF anchor as the canonical set title
+        a = division.select_one("a[href*=\"extension_pdf.php\"]")
         if a:
             set_name = a.get_text(strip=True)
         text_block = division.get_text(" ", strip=True)
