@@ -1,10 +1,22 @@
 async function loadCards(){
-  const res = await fetch('../card_db/cards.json');
+  const res = await fetch('./cards.json');
   if(!res.ok) throw new Error('Failed to load cards.json');
   return await res.json();
 }
 
 function unique(values){ return Array.from(new Set(values.filter(Boolean))).sort(); }
+
+function pad3(n){
+  const s = String(n || '').replace(/\D/g,'');
+  return s.padStart(3, '0');
+}
+
+function remoteImageUrl(card){
+  const code = card.set && card.set.code;
+  const num = card.set && card.set.number;
+  if(!code || !num) return null;
+  return `https://www.uvsultra.online/images/extensions/${code}/${pad3(num)}-preview.jpg`;
+}
 
 function renderFilters(cards){
   const typeSel = document.getElementById('typeFilter');
@@ -44,8 +56,17 @@ function renderCards(cards){
     const sub = el.querySelector('.sub');
     name.textContent = c.name || '';
     sub.textContent = [c.type, c.rarity, c.set && c.set.name, c.set && c.set.number].filter(Boolean).join(' • ');
-    const imgUrl = c.image && c.image.url;
-    if(imgUrl){ img.src = imgUrl.startsWith('http') ? imgUrl : `../${imgUrl}`; }
+    let imgUrl = c.image && c.image.url;
+    if(imgUrl){
+      // If JSON has a local path, it won't exist on GitHub Pages; prefer remote fallback
+      if(!imgUrl.startsWith('http')){
+        const remote = remoteImageUrl(c);
+        imgUrl = remote || '';
+      }
+    } else {
+      imgUrl = remoteImageUrl(c) || '';
+    }
+    if(imgUrl) img.src = imgUrl;
     frag.appendChild(el);
   }
   grid.appendChild(frag);
