@@ -2,7 +2,7 @@ base_url: https://www.uvsultra.online
 list_url: https://www.uvsultra.online/listing_cards.php
 card_link_selector: 'div.card_image'
 pagination_selector: 'ul.pagination li a[href*="listing_cards.php"]'
-rate_limit_seconds: 0.6
+rate_limit_seconds: 0.3
 
 selectors:
   name: 'div.card_title h1'

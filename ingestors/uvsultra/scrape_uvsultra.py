@@ -5,6 +5,7 @@ import os
 import re
 import sys
 import time
+import random
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
@@ -54,10 +55,28 @@ def load_yaml(path: str) -> Dict[str, Any]:
         return yaml.safe_load(f)
 
 
+def request_with_backoff(method: str, url: str, session: requests.Session, delay: float, *, data: Optional[Dict[str, Any]] = None, max_attempts: int = 5) -> requests.Response:
+    attempt = 0
+    while True:
+        try:
+            resp = session.request(method=method, url=url, data=data, timeout=30)
+            status = resp.status_code
+            if status == 429 or status >= 500:
+                raise requests.HTTPError(f"HTTP {status}")
+            resp.raise_for_status()
+            # base delay plus jitter to be polite
+            time.sleep(delay + random.uniform(0, min(0.2, delay)))
+            return resp
+        except Exception:
+            attempt += 1
+            if attempt >= max_attempts:
+                raise
+            backoff = (delay * (2 ** (attempt - 1))) + random.uniform(0, 0.25)
+            time.sleep(backoff)
+
+
 def fetch_html(url: str, session: requests.Session, rate_limit_seconds: float) -> BeautifulSoup:
-    resp = session.get(url, timeout=30)
-    resp.raise_for_status()
-    time.sleep(rate_limit_seconds)
+    resp = request_with_backoff("GET", url, session, rate_limit_seconds)
     return BeautifulSoup(resp.text, "lxml")
 
 
@@ -141,12 +160,10 @@ def discover_card_links_from_listing(soup: BeautifulSoup, base_url: str, link_se
 def find_next_page(soup: BeautifulSoup, base_url: str, pagination_selector: Optional[str]) -> Optional[str]:
     if not pagination_selector:
         return None
-    # Prefer the link with rel=next or the last pagination a after current
     for a in soup.select(f"{pagination_selector}"):
         href = a.get("href")
         if not href:
             continue
-        # Heuristic: the next page likely contains listing_cards.php with an offset param
         if "listing_cards.php" in href:
             return absolutize(base_url, href)
     return None
@@ -172,9 +189,7 @@ def scrape_list(config: Dict[str, Any], session: requests.Session) -> List[str]:
     # Subsequent pages via POST with page=2..N and js=1 until empty
     page = 2
     max_pages = None
-    # If caller provided max pages through argparse, capture it via env var handoff
     try:
-        # The main() function will set an env var to pass max-pages into this function
         from os import getenv
         mp = getenv("UVS_MAX_PAGES")
         max_pages = int(mp) if mp else None
@@ -183,10 +198,7 @@ def scrape_list(config: Dict[str, Any], session: requests.Session) -> List[str]:
     while True:
         if max_pages is not None and page > max_pages:
             break
-        resp = session.post(url, data={"page": str(page), "js": "1"}, timeout=30)
-        if resp.status_code != 200:
-            break
-        time.sleep(delay)
+        resp = request_with_backoff("POST", url, session, delay, data={"page": str(page), "js": "1"})
         page_soup = BeautifulSoup(resp.text, "lxml")
         page_urls = discover_card_links_from_listing(page_soup, base_url, link_sel)
         if not page_urls:
@@ -204,7 +216,6 @@ def scrape_list(config: Dict[str, Any], session: requests.Session) -> List[str]:
 
 
 def parse_detail_fields(soup: BeautifulSoup) -> Dict[str, Optional[str]]:
-    # Basic fields from detail layout
     name = select_text(soup, "div.card_title h1")
     set_name = None
     number = None
@@ -212,17 +223,13 @@ def parse_detail_fields(soup: BeautifulSoup) -> Dict[str, Optional[str]]:
     type_ = None
     rarity = None
     if division:
-        # Set name inside first <a> before '#'
         a = division.select_one("a")
         if a:
             set_name = a.get_text(strip=True)
-        # Number appears like '#123' in the same area
         text_block = division.get_text(" ", strip=True)
         m_num = re.search(r"#\s*(\w+)", text_block)
         if m_num:
             number = m_num.group(1)
-        # Type and Rarity on detail page appear as individual lines after the set line
-        # Gather all stripped strings and look for known types/rarities
         tokens = [s.strip() for s in division.stripped_strings]
         for tok in tokens:
             if tok in ("Character", "Action", "Asset", "Attack", "Foundation") and not type_:
@@ -241,7 +248,6 @@ def parse_detail_fields(soup: BeautifulSoup) -> Dict[str, Optional[str]]:
                 rarity = parts[-1]
 
     image_url = select_text(soup, "img.preview_image::attr(src)")
-    # Rules text block, if present
     text = None
     text_node = soup.select_one("div.card_text, div.card_rules, div.card-description")
     if text_node:
@@ -274,7 +280,6 @@ def scrape_card(url: str, config: Dict[str, Any], session: requests.Session) -> 
     image_url = fields.get("image_url")
     text = fields.get("text")
 
-    # Unknown in this layout; leave None
     cost = None
     attack = None
     health = None
@@ -315,11 +320,9 @@ def download_image(url: str, out_dir: str, session: requests.Session, rate_limit
         filename = re.sub(r"[^a-zA-Z0-9._-]", "_", url.split("/")[-1]) or "card.jpg"
         out_path = os.path.join(out_dir, filename)
         if not os.path.exists(out_path):
-            resp = session.get(url, timeout=30)
-            resp.raise_for_status()
+            resp = request_with_backoff("GET", url, session, rate_limit_seconds)
             with open(out_path, "wb") as f:
                 f.write(resp.content)
-            time.sleep(rate_limit_seconds)
         return out_path
     except Exception:
         return None
