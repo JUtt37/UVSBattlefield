@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UVS Battlefield - Authentic Board Layout</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="game-container">
+        <div class="game-header">
+            <h1>UVS Battlefield - Authentic Board Layout</h1>
+            <div class="game-controls">
+                <button onclick="startGame()">Start Game</button>
+                <button onclick="drawCards()">Draw Cards</button>
+                <button onclick="nextPhase()">Next Phase</button>
+                <button onclick="endTurn()">End Turn</button>
+                <button onclick="resetGame()">Reset Game</button>
+            </div>
+        </div>
+        
+        <div class="game-info">
+            <div>Turn: <span id="turn">1</span></div>
+            <div>Phase: <span id="phase">Start</span></div>
+            <div>Active Player: <span id="active-player">1</span></div>
+            <div>Step: <span id="step">Ready</span></div>
+        </div>
+        
+        <div class="game-board">
+            <!-- Player 1 -->
+            <div class="player-area" id="player1">
+                <div class="health-tracker">
+                    <span>Player 1 Health:</span>
+                    <div class="health-numbers">
+                        <div class="health-number" data-health="20">20</div>
+                        <div class="health-number" data-health="19">19</div>
+                        <div class="health-number" data-health="18">18</div>
+                        <div class="health-number" data-health="17">17</div>
+                        <div class="health-number" data-health="16">16</div>
+                        <div class="health-number" data-health="15">15</div>
+                        <div class="health-number" data-health="14">14</div>
+                        <div class="health-number" data-health="13">13</div>
+                        <div class="health-number" data-health="12">12</div>
+                        <div class="health-number" data-health="11">11</div>
+                        <div class="health-number" data-health="10">10</div>
+                        <div class="health-number" data-health="9">9</div>
+                        <div class="health-number" data-health="8">8</div>
+                        <div class="health-number" data-health="7">7</div>
+                        <div class="health-number" data-health="6">6</div>
+                        <div class="health-number" data-health="5">5</div>
+                        <div class="health-number" data-health="4">4</div>
+                        <div class="health-number" data-health="3">3</div>
+                        <div class="health-number" data-health="2">2</div>
+                        <div class="health-number" data-health="1">1</div>
+                        <div class="health-number" data-health="0">0</div>
+                    </div>
+                </div>
+                
+                <div class="uvs-board">
+                    <div class="zone deck-zone">
+                        <div class="zone-label">Deck</div>
+                        <div class="zone-count" id="p1-deck-count">60</div>
+                        <div id="p1-deck"></div>
+                    </div>
+                    
+                    <div class="zone cardpool-zone">
+                        <div class="zone-label">Card Pool</div>
+                        <div class="zone-count" id="p1-pool-count">0</div>
+                        <div id="p1-cardpool"></div>
+                    </div>
+                    
+                    <div class="zone staging-zone">
+                        <div class="zone-label">Stage</div>
+                        <div class="zone-count" id="p1-stage-count">0</div>
+                        <div id="p1-staging"></div>
+                    </div>
+                    
+                    <div class="zone assets-zone">
+                        <div class="zone-label">Assets</div>
+                        <div class="zone-count" id="p1-assets-count">0</div>
+                        <div id="p1-assets"></div>
+                    </div>
+                    
+                    <div class="zone discard-zone">
+                        <div class="zone-label">Discard</div>
+                        <div class="zone-count" id="p1-discard-count">0</div>
+                        <div id="p1-discard"></div>
+                    </div>
+                    
+                    <div class="zone character-zone">
+                        <div class="zone-label">Character</div>
+                        <div class="zone-count" id="p1-character-count">0</div>
+                        <div id="p1-character"></div>
+                    </div>
+                    
+                    <div class="zone momentum-zone">
+                        <div class="zone-label">Momentum</div>
+                        <div class="zone-count" id="p1-momentum-count">0</div>
+                        <div id="p1-momentum"></div>
+                    </div>
+                    
+                    <div class="zone removed-zone">
+                        <div class="zone-label">Removed</div>
+                        <div class="zone-count" id="p1-removed-count">0</div>
+                        <div id="p1-removed"></div>
+                    </div>
+                    
+                    <div class="foundations-zone-horizontal">
+                        <div class="zone-label">Foundations</div>
+                        <div class="zone-count" id="p1-foundations-count">0</div>
+                        <div id="p1-foundations"></div>
+                    </div>
+                    
+                    <div class="zone rfg-zone">
+                        <div class="zone-label">RFG</div>
+                        <div class="zone-count" id="p1-rfg-count">0</div>
+                        <div id="p1-rfg"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Player 2 -->
+            <div class="player-area" id="player2">
+                <div class="health-tracker">
+                    <span>Player 2 Health:</span>
+                    <div class="health-numbers">
+                        <div class="health-number" data-health="20">20</div>
+                        <div class="health-number" data-health="19">19</div>
+                        <div class="health-number" data-health="18">18</div>
+                        <div class="health-number" data-health="17">17</div>
+                        <div class="health-number" data-health="16">16</div>
+                        <div class="health-number" data-health="15">15</div>
+                        <div class="health-number" data-health="14">14</div>
+                        <div class="health-number" data-health="13">13</div>
+                        <div class="health-number" data-health="12">12</div>
+                        <div class="health-number" data-health="11">11</div>
+                        <div class="health-number" data-health="10">10</div>
+                        <div class="health-number" data-health="9">9</div>
+                        <div class="health-number" data-health="8">8</div>
+                        <div class="health-number" data-health="7">7</div>
+                        <div class="health-number" data-health="6">6</div>
+                        <div class="health-number" data-health="5">5</div>
+                        <div class="health-number" data-health="4">4</div>
+                        <div class="health-number" data-health="3">3</div>
+                        <div class="health-number" data-health="2">2</div>
+                        <div class="health-number" data-health="1">1</div>
+                        <div class="health-number" data-health="0">0</div>
+                    </div>
+                </div>
+                
+                <div class="uvs-board">
+                    <div class="zone deck-zone">
+                        <div class="zone-label">Deck</div>
+                        <div class="zone-count" id="p2-deck-count">60</div>
+                        <div id="p2-deck"></div>
+                    </div>
+                    
+                    <div class="zone cardpool-zone">
+                        <div class="zone-label">Card Pool</div>
+                        <div class="zone-count" id="p2-pool-count">0</div>
+                        <div id="p2-cardpool"></div>
+                    </div>
+                    
+                    <div class="zone staging-zone">
+                        <div class="zone-label">Stage</div>
+                        <div class="zone-count" id="p2-stage-count">0</div>
+                        <div id="p2-staging"></div>
+                    </div>
+                    
+                    <div class="zone assets-zone">
+                        <div class="zone-label">Assets</div>
+                        <div class="zone-count" id="p2-assets-count">0</div>
+                        <div id="p2-assets"></div>
+                    </div>
+                    
+                    <div class="zone discard-zone">
+                        <div class="zone-label">Discard</div>
+                        <div class="zone-count" id="p2-discard-count">0</div>
+                        <div id="p2-discard"></div>
+                    </div>
+                    
+                    <div class="zone character-zone">
+                        <div class="zone-label">Character</div>
+                        <div class="zone-count" id="p2-character-count">0</div>
+                        <div id="p2-character"></div>
+                    </div>
+                    
+                    <div class="zone momentum-zone">
+                        <div class="zone-label">Momentum</div>
+                        <div class="zone-count" id="p2-momentum-count">0</div>
+                        <div id="p2-momentum"></div>
+                    </div>
+                    
+                    <div class="zone removed-zone">
+                        <div class="zone-label">Removed</div>
+                        <div class="zone-count" id="p2-removed-count">0</div>
+                        <div id="p2-removed"></div>
+                    </div>
+                    
+                    <div class="foundations-zone-horizontal">
+                        <div class="zone-label">Foundations</div>
+                        <div class="zone-count" id="p2-foundations-count">0</div>
+                        <div id="p2-foundations"></div>
+                    </div>
+                    
+                    <div class="zone rfg-zone">
+                        <div class="zone-label">RFG</div>
+                        <div class="zone-count" id="p2-rfg-count">0</div>
+                        <div id="p2-rfg"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Hand Area -->
+        <div class="hand-area">
+            <h3>Your Hand</h3>
+            <div id="hand-cards" class="hand-cards">
+                <div style="color: #666;">Click "Start Game" then "Draw Cards" to see your hand</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // UVS Game Engine with Authentic Board Layout and Check System
+        const game = {
+            turn: 1,
+            activePlayer: 0,
+            phase: 'Start',
+            step: 'Ready',
+            gameStarted: false,
+            players: [
+                { 
+                    health: 20,
+                    handSize: 7, // Add hand size property
+                    deck: [], 
+                    hand: [], 
+                    cardPool: [], 
+                    stage: [], 
+                    discard: [],
+                    momentum: [],
+                    removed: [],
+                    assets: [],
+                    character: [],
+                    foundations: []
+                },
+                { 
+                    health: 20,
+                    handSize: 7, // Add hand size property
+                    deck: [], 
+                    hand: [], 
+                    cardPool: [], 
+                    stage: [], 
+                    discard: [],
+                    momentum: [],
+                    removed: [],
+                    assets: [],
+                    character: [],
+                    foundations: []
+                }
+            ],
+            
+            // Sample cards for testing
+            sampleCards: [
+                { id: 1, name: "Punch", type: "Attack", difficulty: 1, check: 2, block: 1 },
+                { id: 2, name: "Kick", type: "Attack", difficulty: 2, check: 3, block: 2 },
+                { id: 3, name: "Block", type: "Foundation", difficulty: 1, check: 2, block: 3 },
+                { id: 4, name: "Dodge", type: "Foundation", difficulty: 1, check: 1, block: 1 },
+                { id: 5, name: "Combo", type: "Attack", difficulty: 3, check: 4, block: 2 },
+                { id: 6, name: "Counter", type: "Foundation", difficulty: 2, check: 3, block: 4 },
+                { id: 7, name: "Special", type: "Action", difficulty: 2, check: 3, block: 0 },
+                { id: 8, name: "Ultimate", type: "Attack", difficulty: 4, check: 5, block: 3 },
+                { id: 9, name: "Defense", type: "Foundation", difficulty: 1, check: 2, block: 2 },
+                { id: 10, name: "Strike", type: "Attack", difficulty: 2, check: 3, block: 1 }
+            ]
+        };
+
+        function startGame() {
+            game.gameStarted = true;
+            game.turn = 1;
+            game.activePlayer = 0;
+            game.phase = 'Start';
+            game.step = 'Ready';
+            
+            // Create decks for both players
+            game.players.forEach(player => {
+                player.deck = [...game.sampleCards, ...game.sampleCards, ...game.sampleCards, ...game.sampleCards, ...game.sampleCards, ...game.sampleCards]; // 60 cards
+                player.hand = [];
+                player.cardPool = [];
+                player.stage = [];
+                player.discard = [];
+                player.momentum = [];
+                player.removed = [];
+                player.assets = [];
+                player.character = [];
+                player.foundations = [];
+                player.handSize = 7; // Set default hand size
+            });
+            
+            // Give both players their starting hand size
+            game.players.forEach(player => {
+                for (let i = 0; i < player.handSize && player.deck.length > 0; i++) {
+                    const randomIndex = Math.floor(Math.random() * player.deck.length);
+                    const card = player.deck.splice(randomIndex, 1)[0];
+                    player.hand.push(card);
+                }
+            });
+            
+            updateDisplay();
+            alert('Game started! Both players have drawn their starting hands. First player skips Start Phase on their first turn.');
+        }
+
+        function drawToHandSize() {
+            if (!game.gameStarted) return;
+            
+            const player = game.players[game.activePlayer];
+            const cardsToDraw = player.handSize - player.hand.length;
+            
+            if (cardsToDraw > 0) {
+                for (let i = 0; i < cardsToDraw && player.deck.length > 0; i++) {
+                    const randomIndex = Math.floor(Math.random() * player.deck.length);
+                    const card = player.deck.splice(randomIndex, 1)[0];
+                    player.hand.push(card);
+                }
+                
+                if (cardsToDraw > 0) {
+                    alert(`Drew ${Math.min(cardsToDraw, player.deck.length)} cards to hand size (${player.handSize})`);
+                }
+            }
+            
+            updateDisplay();
+        }
+
+        function readyAllCards() {
+            if (!game.gameStarted) return;
+            
+            const player = game.players[game.activePlayer];
+            let readyCount = 0;
+            
+            // Ready all committed foundations for the ACTIVE PLAYER ONLY
+            player.foundations.forEach(foundation => {
+                if (foundation.committed) {
+                    foundation.committed = false;
+                    readyCount++;
+                }
+            });
+            
+            if (readyCount > 0) {
+                alert(`Ready Step: ${readyCount} foundations readied`);
+            }
+            
+            updateDisplay();
+        }
+
+        function playCard(cardIndex) {
+            if (!game.gameStarted) return;
+            
+            const player = game.players[game.activePlayer];
+            if (cardIndex >= player.hand.length) return;
+            
+            const card = player.hand[cardIndex];
+            
+            // Check card pool limit (10 cards)
+            if (player.cardPool.length >= 10) {
+                alert('Card Pool is full (max 10 cards)!');
+                return;
+            }
+            
+            // Check if deck has cards for check
+            if (player.deck.length === 0) {
+                alert('Cannot play card: No cards in deck for check!');
+                return;
+            }
+            
+            // Calculate required difficulty (progressive difficulty)
+            const requiredDifficulty = card.difficulty + player.cardPool.length;
+            
+            // Perform check by discarding top card
+            const checkCard = player.deck.splice(0, 1)[0]; // Remove top card
+            player.discard.push(checkCard); // Add to discard
+            
+            const checkValue = checkCard.check;
+            
+            // Check if check passes
+            if (checkValue >= requiredDifficulty) {
+                // Check passes - play the card
+                player.hand.splice(cardIndex, 1);
+                player.cardPool.push(card);
+                
+                updateDisplay();
+                alert(`Check passed! ${checkCard.name} (${checkValue}) ≥ ${requiredDifficulty}. ${card.name} played successfully!`);
+            } else {
+                // Check fails - need foundations to commit
+                const shortfall = requiredDifficulty - checkValue;
+                const availableFoundations = player.foundations.filter(f => !f.committed);
+                
+                if (availableFoundations.length >= shortfall) {
+                    // Can commit enough foundations
+                    const foundationsToCommit = availableFoundations.slice(0, shortfall);
+                    foundationsToCommit.forEach(f => f.committed = true);
+                    
+                    player.hand.splice(cardIndex, 1);
+                    player.cardPool.push(card);
+                    
+                    updateDisplay();
+                    alert(`Check failed! ${checkCard.name} (${checkValue}) < ${requiredDifficulty}. Committed ${shortfall} foundations. ${card.name} played successfully!`);
+                } else {
+                    // Cannot play the card - FORCED TURN END
+                    updateDisplay();
+                    alert(`Check failed! ${checkCard.name} (${checkValue}) < ${requiredDifficulty}. Need ${shortfall} foundations but only have ${availableFoundations.length} available. ${card.name} cannot be played! FORCED TURN END!`);
+                    
+                    // Distribute cards and end turn
+                    distributeCardPool(game.activePlayer);
+                    nextTurn();
+                }
+            }
+        }
+
+        function distributeCardPool(playerIndex) {
+            const player = game.players[playerIndex];
+            const distribution = {
+                foundations: [],
+                attacks: [],
+                actions: [],
+                assets: [],
+                characters: []
+            };
+            
+            // Categorize cards in card pool
+            player.cardPool.forEach(card => {
+                switch(card.type) {
+                    case 'Foundation':
+                        distribution.foundations.push(card);
+                        break;
+                    case 'Attack':
+                        // For now, assume attacks deal base damage (we'll add block/damage calculation later)
+                        distribution.attacks.push(card);
+                        break;
+                    case 'Action':
+                        distribution.actions.push(card);
+                        break;
+                    case 'Asset':
+                        distribution.assets.push(card);
+                        break;
+                    case 'Character':
+                        distribution.characters.push(card);
+                        break;
+                }
+            });
+            
+            // Move cards to appropriate zones
+            // Foundations go to foundations zone (UNCOMMITTED - they're newly built)
+            distribution.foundations.forEach(foundation => {
+                foundation.committed = false; // Ensure new foundations are uncommitted
+                player.foundations.push(foundation);
+            });
+            
+            // Attacks that dealt damage go to momentum (for now, all attacks)
+            player.momentum.push(...distribution.attacks);
+            
+            // Actions go to discard
+            player.discard.push(...distribution.actions);
+            
+            // Assets go to assets zone
+            player.assets.push(...distribution.assets);
+            
+            // Characters go to character zone
+            player.character.push(...distribution.characters);
+            
+            // Clear card pool
+            player.cardPool = [];
+            
+            // Show distribution results
+            const results = [];
+            if (distribution.foundations.length > 0) results.push(`${distribution.foundations.length} Foundations → Foundations zone (uncommitted)`);
+            if (distribution.attacks.length > 0) results.push(`${distribution.attacks.length} Attacks → Momentum zone`);
+            if (distribution.actions.length > 0) results.push(`${distribution.actions.length} Actions → Discard pile`);
+            if (distribution.assets.length > 0) results.push(`${distribution.assets.length} Assets → Assets zone`);
+            if (distribution.characters.length > 0) results.push(`${distribution.characters.length} Characters → Character zone`);
+            
+            alert(`Turn End - Card Distribution:\n${results.join('\n')}`);
+        }
+
+        function commitFoundation(foundationIndex) {
+            if (!game.gameStarted) return;
+            
+            const player = game.players[game.activePlayer];
+            if (foundationIndex >= player.foundations.length) return;
+            
+            const foundation = player.foundations[foundationIndex];
+            foundation.committed = !foundation.committed; // Toggle committed state
+            
+            updateDisplay();
+        }
+
+        function endTurn() {
+            if (!game.gameStarted) return;
+            
+            // Distribute cards from card pool
+            distributeCardPool(game.activePlayer);
+            
+            // Switch to next player
+            nextTurn();
+        }
+
+        function nextPhase() {
+            if (!game.gameStarted) return;
+            
+            const phases = ['Start', 'Combat', 'End'];
+            const currentIndex = phases.indexOf(game.phase);
+            const nextIndex = (currentIndex + 1) % phases.length;
+            
+            game.phase = phases[nextIndex];
+            if (game.phase === 'Start') {
+                game.step = 'Ready';
+                // Ready all committed foundations
+                readyAllCards();
+                // Draw to hand size
+                drawToHandSize();
+            } else if (game.phase === 'End') {
+                endTurn();
+                return;
+            }
+            
+            updateDisplay();
+        }
+
+        function nextTurn() {
+            if (!game.gameStarted) return;
+            
+            game.activePlayer = (game.activePlayer + 1) % 2;
+            game.turn++;
+            game.phase = 'Start';
+            game.step = 'Ready';
+            
+            // First player skips Start Phase on turn 1
+            if (game.turn === 1 && game.activePlayer === 0) {
+                // First player's first turn - skip Start Phase
+                game.phase = 'Combat';
+                game.step = 'Main';
+                alert('First player skips Start Phase on turn 1');
+            } else {
+                // Automatically ready cards and draw to hand size at start of turn
+                readyAllCards();
+                drawToHandSize();
+            }
+            
+            updateDisplay();
+        }
+
+        function resetGame() {
+            game.gameStarted = false;
+            game.turn = 1;
+            game.activePlayer = 0;
+            game.phase = 'Start';
+            game.step = 'Ready';
+            game.players.forEach(player => {
+                player.health = 20;
+                player.deck = [];
+                player.hand = [];
+                player.cardPool = [];
+                player.stage = [];
+                player.discard = [];
+                player.momentum = [];
+                player.removed = [];
+                player.assets = [];
+                player.character = [];
+                player.foundations = [];
+                player.handSize = 7; // Reset hand size
+            });
+            
+            updateDisplay();
+        }
+
+        function updateDisplay() {
+            // Update game info
+            document.getElementById('turn').textContent = game.turn;
+            document.getElementById('phase').textContent = game.phase;
+            document.getElementById('active-player').textContent = game.activePlayer + 1;
+            document.getElementById('step').textContent = game.step;
+            
+            // Update player areas
+            game.players.forEach((player, index) => {
+                const playerArea = document.getElementById(`player${index + 1}`);
+                playerArea.classList.toggle('active', index === game.activePlayer);
+                
+                // Update zone counts
+                document.getElementById(`p${index + 1}-deck-count`).textContent = player.deck.length;
+                document.getElementById(`p${index + 1}-pool-count`).textContent = player.cardPool.length;
+                document.getElementById(`p${index + 1}-stage-count`).textContent = player.stage.length;
+                document.getElementById(`p${index + 1}-discard-count`).textContent = player.discard.length;
+                document.getElementById(`p${index + 1}-momentum-count`).textContent = player.momentum.length;
+                document.getElementById(`p${index + 1}-removed-count`).textContent = player.removed.length;
+                document.getElementById(`p${index + 1}-assets-count`).textContent = player.assets.length;
+                document.getElementById(`p${index + 1}-character-count`).textContent = player.character.length;
+                document.getElementById(`p${index + 1}-foundations-count`).textContent = player.foundations.length;
+                document.getElementById(`p${index + 1}-rfg-count`).textContent = player.removed.length;
+                
+                // Update zone displays
+                updateZoneDisplay(`p${index + 1}-cardpool`, player.cardPool);
+                updateZoneDisplay(`p${index + 1}-staging`, player.stage);
+                updateZoneDisplay(`p${index + 1}-discard`, player.discard);
+                updateZoneDisplay(`p${index + 1}-momentum`, player.momentum);
+                updateZoneDisplay(`p${index + 1}-removed`, player.removed);
+                updateZoneDisplay(`p${index + 1}-assets`, player.assets);
+                updateZoneDisplay(`p${index + 1}-character`, player.character);
+                updateZoneDisplay(`p${index + 1}-foundations`, player.foundations, true); // Show committed state
+            });
+            
+            // Update hand display
+            const handCards = document.getElementById('hand-cards');
+            if (game.gameStarted && game.players[game.activePlayer].hand.length > 0) {
+                handCards.innerHTML = game.players[game.activePlayer].hand.map((card, index) => 
+                    `<div class="hand-card" onclick="playCard(${index})">
+                        <div style="font-weight: bold;">${card.name}</div>
+                        <div style="font-size: 10px;">${card.type}</div>
+                        <div style="font-size: 9px;">D:${card.difficulty} C:${card.check}</div>
+                    </div>`
+                ).join('');
+            } else if (game.gameStarted) {
+                handCards.innerHTML = '<div style="color: #666;">Click "Draw Cards" to draw your hand</div>';
+            } else {
+                handCards.innerHTML = '<div style="color: #666;">Click "Start Game" then "Draw Cards" to see your hand</div>';
+            }
+        }
+
+        function updateZoneDisplay(zoneId, cards, showCommitted = false) {
+            const zoneElement = document.getElementById(zoneId);
+            if (zoneElement) {
+                // Special handling for deck zone - show only top card as face-down
+                if (zoneId.includes('deck')) {
+                    const cardCount = cards.length;
+                    if (cardCount > 0) {
+                        // Show only the top card of the deck
+                        zoneElement.innerHTML = `<div class="card face-down">
+                            <div class="card-name">Deck</div>
+                            <div class="card-type">${cardCount} cards</div>
+                        </div>`;
+                    } else {
+                        zoneElement.innerHTML = '';
+                    }
+                    return;
+                }
+                
+                // Special handling for discard zone - show only top card
+                if (zoneId.includes('discard')) {
+                    const cardCount = cards.length;
+                    if (cardCount > 0) {
+                        // Show only the top card of the discard pile
+                        const topCard = cards[cards.length - 1];
+                        zoneElement.innerHTML = `<div class="card">
+                            <div class="card-name">${topCard.name}</div>
+                            <div class="card-type">${topCard.type}</div>
+                        </div>`;
+                    } else {
+                        zoneElement.innerHTML = '';
+                    }
+                    return;
+                }
+                
+                // Regular card display for all other zones (including foundations)
+                zoneElement.innerHTML = cards.map((card, index) => {
+                    let cardClass = 'card';
+                    let cardStyle = '';
+                    
+                    if (showCommitted && card.committed) {
+                        cardClass += ' committed';
+                        cardStyle = 'transform: rotate(90deg); opacity: 0.7;';
+                    }
+                    
+                    return `<div class="${cardClass}" style="${cardStyle}" ${showCommitted ? `onclick="commitFoundation(${index})"` : ''}>
+                        <div class="card-name">${card.name}</div>
+                        <div class="card-type">${card.type}</div>
+                    </div>`;
+                }).join('');
+            }
+        }
+
+        // Initialize
+        updateDisplay();
+    </script>
+</body>
+</html>
