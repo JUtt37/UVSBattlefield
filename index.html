@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>UVS Battlefield - Authentic Board Layout</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="src/style.css">
 </head>
 <body>
     <div class="game-container">
@@ -13,9 +13,19 @@
             <div class="game-controls">
                 <button onclick="startGame()">Start Game</button>
                 <button onclick="drawCards()">Draw Cards</button>
+                <button onclick="mulligan()" id="mulligan-btn" style="display: none;">Mulligan</button>
+                <button onclick="keepHand()" id="keep-hand-btn" style="display: none;">Keep Hand</button>
                 <button onclick="nextPhase()">Next Phase</button>
                 <button onclick="endTurn()">End Turn</button>
                 <button onclick="resetGame()">Reset Game</button>
+                <div class="attack-sequence-controls" style="display: none;">
+                    <button onclick="passEnhance()">Pass Enhance</button>
+                <button onclick="passBlock()">Pass Block</button>
+                </div>
+                <div class="ability-controls" style="display: none;">
+                    <button onclick="checkEnhanceAbilities()">Check Enhances</button>
+                    <button onclick="passAbility()">Pass Ability</button>
+                </div>
             </div>
         </div>
         
@@ -24,6 +34,11 @@
             <div>Phase: <span id="phase">Start</span></div>
             <div>Active Player: <span id="active-player">1</span></div>
             <div>Step: <span id="step">Ready</span></div>
+        </div>
+        
+        <div class="ability-display" id="ability-display" style="display: none;">
+            <h3>Available Abilities</h3>
+            <div id="ability-list"></div>
         </div>
         
         <div class="game-board">
@@ -63,10 +78,10 @@
                         <div id="p1-deck"></div>
                     </div>
                     
-                    <div class="zone cardpool-zone">
+                    <div class="cardpool-container">
                         <div class="zone-label">Card Pool</div>
                         <div class="zone-count" id="p1-pool-count">0</div>
-                        <div id="p1-cardpool"></div>
+                        <div id="p1-cardpool" class="cardpool-zone"></div>
                     </div>
                     
                     <div class="zone staging-zone">
@@ -105,10 +120,10 @@
                         <div id="p1-removed"></div>
                     </div>
                     
-                    <div class="foundations-zone-horizontal">
+                    <div class="foundations-container">
                         <div class="zone-label">Foundations</div>
                         <div class="zone-count" id="p1-foundations-count">0</div>
-                        <div id="p1-foundations"></div>
+                        <div id="p1-foundations" class="foundations-zone"></div>
                     </div>
                     
                     <div class="zone rfg-zone">
@@ -155,10 +170,10 @@
                         <div id="p2-deck"></div>
                     </div>
                     
-                    <div class="zone cardpool-zone">
+                    <div class="cardpool-container">
                         <div class="zone-label">Card Pool</div>
                         <div class="zone-count" id="p2-pool-count">0</div>
-                        <div id="p2-cardpool"></div>
+                        <div id="p2-cardpool" class="cardpool-zone"></div>
                     </div>
                     
                     <div class="zone staging-zone">
@@ -197,10 +212,10 @@
                         <div id="p2-removed"></div>
                     </div>
                     
-                    <div class="foundations-zone-horizontal">
+                    <div class="foundations-container">
                         <div class="zone-label">Foundations</div>
                         <div class="zone-count" id="p2-foundations-count">0</div>
-                        <div id="p2-foundations"></div>
+                        <div id="p2-foundations" class="foundations-zone"></div>
                     </div>
                     
                     <div class="zone rfg-zone">
@@ -214,13 +229,20 @@
         
         <!-- Hand Area -->
         <div class="hand-area">
-            <h3>Your Hand</h3>
+            <h3 id="hand-label">Your Hand</h3>
             <div id="hand-cards" class="hand-cards">
                 <div style="color: #666;">Click "Start Game" then "Draw Cards" to see your hand</div>
             </div>
         </div>
     </div>
 
+    <!-- Card Preview Overlay -->
+    <div class="card-preview-overlay" id="card-preview-overlay">
+        <button class="card-preview-close" onclick="closeCardPreview()">×</button>
+        <img class="card-preview-image" id="card-preview-image" src="" alt="Card Preview">
+    </div>
+
+            <script src="ingestors/game_startup_with_abilities.js"></script>
     <script>
         // UVS Game Engine with Authentic Board Layout and Check System
         const game = {
@@ -229,6 +251,17 @@
             phase: 'Start',
             step: 'Ready',
             gameStarted: false,
+            mulliganPhase: false,
+            currentMulliganPlayer: 0,
+            attackSequence: {
+                active: false,
+                currentAttack: null,
+                currentStep: 'Enhance', // Enhance, Block, Damage
+                attackingPlayer: null,
+                defendingPlayer: null,
+                enhancePasses: 0, // Track consecutive passes
+                currentEnhancePlayer: null // Who's turn to enhance
+            },
             players: [
                 { 
                     health: 20,
@@ -242,7 +275,8 @@
                     removed: [],
                     assets: [],
                     character: [],
-                    foundations: []
+                    foundations: [],
+                    mulliganUsed: false
                 },
                 { 
                     health: 20,
@@ -256,58 +290,430 @@
                     removed: [],
                     assets: [],
                     character: [],
-                    foundations: []
+                    foundations: [],
+                    mulliganUsed: false
                 }
             ],
             
-            // Sample cards for testing
-            sampleCards: [
-                { id: 1, name: "Punch", type: "Attack", difficulty: 1, check: 2, block: 1 },
-                { id: 2, name: "Kick", type: "Attack", difficulty: 2, check: 3, block: 2 },
-                { id: 3, name: "Block", type: "Foundation", difficulty: 1, check: 2, block: 3 },
-                { id: 4, name: "Dodge", type: "Foundation", difficulty: 1, check: 1, block: 1 },
-                { id: 5, name: "Combo", type: "Attack", difficulty: 3, check: 4, block: 2 },
-                { id: 6, name: "Counter", type: "Foundation", difficulty: 2, check: 3, block: 4 },
-                { id: 7, name: "Special", type: "Action", difficulty: 2, check: 3, block: 0 },
-                { id: 8, name: "Ultimate", type: "Attack", difficulty: 4, check: 5, block: 3 },
-                { id: 9, name: "Defense", type: "Foundation", difficulty: 1, check: 2, block: 2 },
-                { id: 10, name: "Strike", type: "Attack", difficulty: 2, check: 3, block: 1 }
-            ]
+            // UVS Card Database - Loaded from JSON file
+            sampleCards: []
         };
 
+        // Load UVS card database from hosted JSON
+        async function loadCardDatabase() {
+            try {
+                const response = await fetch('https://jutt37.github.io/UVSBattlefield/cards.json');
+                if (!response.ok) {
+                    console.warn('Could not load card database from hosted JSON, using fallback cards');
+                    return;
+                }
+                const data = await response.json();
+                game.sampleCards = data.cards || data || [];
+                console.log(`Loaded ${game.sampleCards.length} cards from hosted database`);
+                
+                // If no cards loaded, show a helpful message
+                if (game.sampleCards.length === 0) {
+                    console.log('No cards in database. Check the hosted JSON URL.');
+                }
+            } catch (error) {
+                console.warn('Error loading card database:', error);
+            }
+        }
+
+        // Helper functions for image URLs
+        function pad3(n) { 
+            return String(n || '').replace(/\D/g,'').padStart(3,'0'); 
+        }
+        
+        function getImageUrl(card) {
+            // Check if card.image is a direct URL string (from GAME_DATA)
+            if (card.image && typeof card.image === 'string' && card.image.startsWith('http')) {
+                return card.image;
+            }
+            // Check if card.image is an object with url property (from old format)
+            const url = card.image && card.image.url;
+            if (url && url.startsWith('http')) return url;
+            // Fallback to UVS image format
+            const code = card.set && card.set.code;
+            const num = card.set && card.set.number;
+            if (!code || !num) return '';
+            // preview first, fallback to mini if preview 404s
+            return `https://www.uvsultra.online/images/extensions/${code}/${pad3(num)}-preview.jpg`;
+        }
+
+        // Helper functions for nested card properties
+        function getCardSpeed(card) {
+            // Try nested structure first, then fallback to flattened
+            return (card.attack && card.attack.speed) || card.speed || 0;
+        }
+        
+        function getCardDamage(card) {
+            // Try nested structure first, then fallback to flattened
+            return (card.attack && card.attack.damage) || card.damage || 0;
+        }
+        
+        function getCardZone(card) {
+            // Try nested structure first, then fallback to flattened
+            return (card.attack && card.attack.zone) || card.zone || 'mid';
+        }
+        
+        function getCardBlock(card) {
+            // Try nested structure first, then fallback to flattened
+            return (card.block && card.block.modifier) || card.block || 0;
+        }
+        
+        function getCardBlockZone(card) {
+            // Try nested structure first, then fallback to flattened
+            return (card.block && card.block.zone) || card.blockZone || 'mid';
+        }
+
         function startGame() {
-            game.gameStarted = true;
-            game.turn = 1;
-            game.activePlayer = 0;
-            game.phase = 'Start';
-            game.step = 'Ready';
+            if (game.gameStarted) {
+                alert('Game already started!');
+                return;
+            }
             
-            // Create decks for both players
-            game.players.forEach(player => {
-                player.deck = [...game.sampleCards, ...game.sampleCards, ...game.sampleCards, ...game.sampleCards, ...game.sampleCards, ...game.sampleCards]; // 60 cards
-                player.hand = [];
-                player.cardPool = [];
-                player.stage = [];
-                player.discard = [];
-                player.momentum = [];
-                player.removed = [];
-                player.assets = [];
-                player.character = [];
-                player.foundations = [];
-                player.handSize = 7; // Set default hand size
+            // Load game data
+            if (typeof GAME_DATA === 'undefined') {
+                alert('Game data not loaded!');
+                return;
+            }
+            
+            // Initialize players with unique card identifiers
+            game.players = [
+                {
+                    id: 0,
+                    name: 'Player 1',
+                    health: GAME_DATA.character.vitality,
+                    handSize: GAME_DATA.character.handSize,
+                    hand: [],
+                    deck: [],
+                    cardPool: [],
+                    stage: [],
+                    foundations: [],
+                    assets: [],
+                    discard: [],
+                    momentum: [],
+                    removed: [],
+                    character: [{
+                        ...GAME_DATA.character,
+                        image: GAME_DATA.character.image || '',
+                        uniqueId: 'char_p1_' + Date.now() + '_' + Math.random()
+                    }],
+                    mulliganUsed: false
+                },
+                {
+                    id: 1,
+                    name: 'Player 2',
+                    health: GAME_DATA.character.vitality,
+                    handSize: GAME_DATA.character.handSize,
+                    hand: [],
+                    deck: [],
+                    cardPool: [],
+                    stage: [],
+                    foundations: [],
+                    assets: [],
+                    discard: [],
+                    momentum: [],
+                    removed: [],
+                    character: [{
+                        ...GAME_DATA.character,
+                        image: GAME_DATA.character.image || '',
+                        uniqueId: 'char_p2_' + Date.now() + '_' + Math.random()
+                    }],
+                    mulliganUsed: false
+                }
+            ];
+            
+            // Add unique identifiers to all cards to prevent cross-player interference
+            let cardCounter = 0;
+            
+            // Process character abilities
+            if (GAME_DATA.character.abilities) {
+                game.players[0].character[0].enhances = [];
+                game.players[0].character[0].responses = [];
+                game.players[0].character[0].static = [];
+                
+                GAME_DATA.character.abilities.forEach(ability => {
+                    let parsed = null;
+                    if (typeof abilitySystem !== 'undefined') {
+                        parsed = abilitySystem.parseAbility(ability);
+                    } else {
+                        // Fallback parsing if abilitySystem is not available
+                        if (ability.startsWith('E:') || ability.startsWith('Enhance:') || ability.startsWith('Enhance ')) {
+                            parsed = { type: 'enhance' };
+                        } else if (ability.startsWith('R:') || ability.startsWith('Response:') || ability.startsWith('Response ')) {
+                            parsed = { type: 'response' };
+                        } else {
+                            parsed = { type: 'static' };
+                        }
+                    }
+                    
+                    if (parsed.type === 'enhance') {
+                        game.players[0].character[0].enhances.push(ability);
+                    } else if (parsed.type === 'response') {
+                        game.players[0].character[0].responses.push(ability);
+                    } else {
+                        game.players[0].character[0].static.push(ability);
+                    }
+                });
+                
+                // Copy character abilities to player 2
+                game.players[1].character[0].enhances = [...game.players[0].character[0].enhances];
+                game.players[1].character[0].responses = [...game.players[0].character[0].responses];
+                game.players[1].character[0].static = [...game.players[0].character[0].static];
+            }
+            
+            // Process foundations with unique IDs
+            GAME_DATA.deck.foundations.forEach(foundation => {
+                const p1Foundation = {
+                    ...foundation,
+                    uniqueId: 'foundation_p1_' + cardCounter + '_' + Date.now() + '_' + Math.random(),
+                    committed: false,
+                    enhances: [],
+                    responses: [],
+                    static: []
+                };
+                
+                const p2Foundation = {
+                    ...foundation,
+                    uniqueId: 'foundation_p2_' + cardCounter + '_' + Date.now() + '_' + Math.random(),
+                    committed: false,
+                    enhances: [],
+                    responses: [],
+                    static: []
+                };
+                
+                // Parse abilities
+                if (foundation.abilities) {
+                    foundation.abilities.forEach(ability => {
+                        let parsed = null;
+                        if (typeof abilitySystem !== 'undefined') {
+                            parsed = abilitySystem.parseAbility(ability);
+                        } else {
+                            // Fallback parsing if abilitySystem is not available
+                            if (ability.startsWith('E:') || ability.startsWith('Enhance:') || ability.startsWith('Enhance ')) {
+                                parsed = { type: 'enhance' };
+                            } else if (ability.startsWith('R:') || ability.startsWith('Response:') || ability.startsWith('Response ')) {
+                                parsed = { type: 'response' };
+                            } else {
+                                parsed = { type: 'static' };
+                            }
+                        }
+                        
+                        if (parsed.type === 'enhance') {
+                            p1Foundation.enhances.push(ability);
+                            p2Foundation.enhances.push(ability);
+                        } else if (parsed.type === 'response') {
+                            p1Foundation.responses.push(ability);
+                            p2Foundation.responses.push(ability);
+                        } else {
+                            p1Foundation.static.push(ability);
+                            p2Foundation.static.push(ability);
+                        }
+                    });
+                }
+                
+                game.players[0].deck.push(p1Foundation);
+                game.players[1].deck.push(p2Foundation);
+                cardCounter++;
             });
             
-            // Give both players their starting hand size
+            // Process attacks with unique IDs
+            GAME_DATA.deck.attacks.forEach(attack => {
+                const p1Attack = {
+                    ...attack,
+                    uniqueId: 'attack_p1_' + cardCounter + '_' + Date.now() + '_' + Math.random(),
+                    enhances: [],
+                    responses: [],
+                    static: []
+                };
+                
+                const p2Attack = {
+                    ...attack,
+                    uniqueId: 'attack_p2_' + cardCounter + '_' + Date.now() + '_' + Math.random(),
+                    enhances: [],
+                    responses: [],
+                    static: []
+                };
+                
+                // Parse abilities
+                if (attack.abilities) {
+                    attack.abilities.forEach(ability => {
+                        let parsed = null;
+                        if (typeof abilitySystem !== 'undefined') {
+                            parsed = abilitySystem.parseAbility(ability);
+                        } else {
+                            // Fallback parsing if abilitySystem is not available
+                            if (ability.startsWith('E:') || ability.startsWith('Enhance:') || ability.startsWith('Enhance ')) {
+                                parsed = { type: 'enhance' };
+                            } else if (ability.startsWith('R:') || ability.startsWith('Response:') || ability.startsWith('Response ')) {
+                                parsed = { type: 'response' };
+                            } else {
+                                parsed = { type: 'static' };
+                            }
+                        }
+                        
+                        if (parsed.type === 'enhance') {
+                            p1Attack.enhances.push(ability);
+                            p2Attack.enhances.push(ability);
+                        } else if (parsed.type === 'response') {
+                            p1Attack.responses.push(ability);
+                            p2Attack.responses.push(ability);
+                        } else {
+                            p1Attack.static.push(ability);
+                            p2Attack.static.push(ability);
+                        }
+                    });
+                }
+                
+                game.players[0].deck.push(p1Attack);
+                game.players[1].deck.push(p2Attack);
+                cardCounter++;
+            });
+            
+            // Process actions with unique IDs
+            if (GAME_DATA.deck.actions) {
+                GAME_DATA.deck.actions.forEach(action => {
+                    const p1Action = {
+                        ...action,
+                        uniqueId: 'action_p1_' + cardCounter + '_' + Date.now() + '_' + Math.random(),
+                        enhances: [],
+                        responses: [],
+                        static: []
+                    };
+                    
+                    const p2Action = {
+                        ...action,
+                        uniqueId: 'action_p2_' + cardCounter + '_' + Date.now() + '_' + Math.random(),
+                        enhances: [],
+                        responses: [],
+                        static: []
+                    };
+                    
+                    // Parse abilities
+                    if (action.abilities) {
+                        action.abilities.forEach(ability => {
+                            let parsed = null;
+                            if (typeof abilitySystem !== 'undefined') {
+                                parsed = abilitySystem.parseAbility(ability);
+                            } else {
+                                // Fallback parsing if abilitySystem is not available
+                                if (ability.startsWith('E:') || ability.startsWith('Enhance:') || ability.startsWith('Enhance ')) {
+                                    parsed = { type: 'enhance' };
+                                } else if (ability.startsWith('R:') || ability.startsWith('Response:') || ability.startsWith('Response ')) {
+                                    parsed = { type: 'response' };
+                                } else {
+                                    parsed = { type: 'static' };
+                                }
+                            }
+                            
+                            if (parsed.type === 'enhance') {
+                                p1Action.enhances.push(ability);
+                                p2Action.enhances.push(ability);
+                            } else if (parsed.type === 'response') {
+                                p1Action.responses.push(ability);
+                                p2Action.responses.push(ability);
+                            } else {
+                                p1Action.static.push(ability);
+                                p2Action.static.push(ability);
+                            }
+                        });
+                    }
+                    
+                    game.players[0].deck.push(p1Action);
+                    game.players[1].deck.push(p2Action);
+                    cardCounter++;
+                });
+            }
+            
+            // Process assets with unique IDs
+            if (GAME_DATA.deck.assets) {
+                GAME_DATA.deck.assets.forEach(asset => {
+                    const p1Asset = {
+                        ...asset,
+                        uniqueId: 'asset_p1_' + cardCounter + '_' + Date.now() + '_' + Math.random(),
+                        enhances: [],
+                        responses: [],
+                        static: []
+                    };
+                    
+                    const p2Asset = {
+                        ...asset,
+                        uniqueId: 'asset_p2_' + cardCounter + '_' + Date.now() + '_' + Math.random(),
+                        enhances: [],
+                        responses: [],
+                        static: []
+                    };
+                    
+                    // Parse abilities
+                    if (asset.abilities) {
+                        asset.abilities.forEach(ability => {
+                            let parsed = null;
+                            if (typeof abilitySystem !== 'undefined') {
+                                parsed = abilitySystem.parseAbility(ability);
+                            } else {
+                                // Fallback parsing if abilitySystem is not available
+                                if (ability.startsWith('E:') || ability.startsWith('Enhance:') || ability.startsWith('Enhance ')) {
+                                    parsed = { type: 'enhance' };
+                                } else if (ability.startsWith('R:') || ability.startsWith('Response:') || ability.startsWith('Response ')) {
+                                    parsed = { type: 'response' };
+                                } else {
+                                    parsed = { type: 'static' };
+                                }
+                            }
+                            
+                            if (parsed.type === 'enhance') {
+                                p1Asset.enhances.push(ability);
+                                p2Asset.enhances.push(ability);
+                            } else if (parsed.type === 'response') {
+                                p1Asset.responses.push(ability);
+                                p2Asset.responses.push(ability);
+                            } else {
+                                p1Asset.static.push(ability);
+                                p2Asset.static.push(ability);
+                            }
+                        });
+                    }
+                    
+                    game.players[0].deck.push(p1Asset);
+                    game.players[1].deck.push(p2Asset);
+                    cardCounter++;
+                });
+            }
+            
+            // Shuffle decks
+            game.players.forEach(player => {
+                for (let i = player.deck.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [player.deck[i], player.deck[j]] = [player.deck[j], player.deck[i]];
+                }
+            });
+            
+            // Draw initial hands
             game.players.forEach(player => {
                 for (let i = 0; i < player.handSize && player.deck.length > 0; i++) {
-                    const randomIndex = Math.floor(Math.random() * player.deck.length);
-                    const card = player.deck.splice(randomIndex, 1)[0];
+                    const card = player.deck.pop();
                     player.hand.push(card);
                 }
             });
             
+            game.gameStarted = true;
+            game.mulliganPhase = true;
+            game.currentMulliganPlayer = 0;
+            game.activePlayer = 0;
+            game.turn = 1;
+            game.phase = 'Start';
+            game.step = 'Ready';
+            
             updateDisplay();
-            alert('Game started! Both players have drawn their starting hands. First player skips Start Phase on their first turn.');
+            
+            document.getElementById('mulligan-btn').style.display = 'inline-block';
+            document.getElementById('keep-hand-btn').style.display = 'inline-block';
+            document.getElementById('mulligan-btn').textContent = 'Player 1 - Mulligan';
+            document.getElementById('keep-hand-btn').textContent = 'Player 1 - Keep Hand';
+            
+            alert('Game started! Both players may mulligan or keep their hands.');
         }
 
         function drawToHandSize() {
@@ -360,6 +766,18 @@
             
             const card = player.hand[cardIndex];
             
+            // Check if we're in an attack sequence enhance step
+            if (game.attackSequence.active && 
+                game.attackSequence.currentStep === 'Enhance' && 
+                game.attackSequence.currentEnhancePlayer === game.activePlayer) {
+                
+                // Allow playing action cards as enhances during enhance step
+                if (card.type === 'Action' && card.enhances && card.enhances.length > 0) {
+                    playActionAsEnhance(cardIndex);
+                    return;
+                }
+            }
+            
             // Check card pool limit (10 cards)
             if (player.cardPool.length >= 10) {
                 alert('Card Pool is full (max 10 cards)!');
@@ -373,13 +791,25 @@
             }
             
             // Calculate required difficulty (progressive difficulty)
-            const requiredDifficulty = card.difficulty + player.cardPool.length;
+            let requiredDifficulty = card.difficulty + player.cardPool.length;
+            
+            // Apply check bonus if available
+            let checkBonus = 0;
+            if (game.nextCheckBonus && game.nextCheckBonus[game.activePlayer]) {
+                const bonus = game.nextCheckBonus[game.activePlayer];
+                if (card.type === 'Attack' && getCardZone(card) === 'Ranged') {
+                    checkBonus = bonus.rangedBonus;
+                } else {
+                    checkBonus = bonus.bonus;
+                }
+                requiredDifficulty -= checkBonus; // Reduce difficulty by the bonus
+            }
             
             // Perform check by discarding top card
             const checkCard = player.deck.splice(0, 1)[0]; // Remove top card
             player.discard.push(checkCard); // Add to discard
             
-            const checkValue = checkCard.check;
+            const checkValue = checkCard.control || checkCard.check || 0;
             
             // Check if check passes
             if (checkValue >= requiredDifficulty) {
@@ -387,8 +817,21 @@
                 player.hand.splice(cardIndex, 1);
                 player.cardPool.push(card);
                 
-                updateDisplay();
-                alert(`Check passed! ${checkCard.name} (${checkValue}) ≥ ${requiredDifficulty}. ${card.name} played successfully!`);
+                // Clear check bonus after use
+                if (game.nextCheckBonus && game.nextCheckBonus[game.activePlayer]) {
+                    const bonus = game.nextCheckBonus[game.activePlayer];
+                    delete game.nextCheckBonus[game.activePlayer];
+                    alert(`Check bonus from ${bonus.source} applied! Check passed! ${checkCard.name} (${checkValue}) ≥ ${requiredDifficulty}. ${card.name} played successfully!`);
+                } else {
+                    alert(`Check passed! ${checkCard.name} (${checkValue}) ≥ ${requiredDifficulty}. ${card.name} played successfully!`);
+                }
+                
+                // If this is an attack, start the attack sequence
+                if (card.type === 'Attack') {
+                    startAttackSequence(card);
+                } else {
+                    updateDisplay();
+                }
             } else {
                 // Check fails - need foundations to commit
                 const shortfall = requiredDifficulty - checkValue;
@@ -402,8 +845,13 @@
                     player.hand.splice(cardIndex, 1);
                     player.cardPool.push(card);
                     
-                    updateDisplay();
-                    alert(`Check failed! ${checkCard.name} (${checkValue}) < ${requiredDifficulty}. Committed ${shortfall} foundations. ${card.name} played successfully!`);
+                    // If this is an attack, start the attack sequence
+                    if (card.type === 'Attack') {
+                        startAttackSequence(card);
+                    } else {
+                        updateDisplay();
+                        alert(`Check failed! ${checkCard.name} (${checkValue}) < ${requiredDifficulty}. Committed ${shortfall} foundations. ${card.name} played successfully!`);
+                    }
                 } else {
                     // Cannot play the card - FORCED TURN END
                     updateDisplay();
@@ -414,6 +862,155 @@
                     nextTurn();
                 }
             }
+        }
+
+        function playActionAsEnhance(cardIndex) {
+            if (!game.attackSequence.active || game.attackSequence.currentStep !== 'Enhance') {
+                alert('No enhance step active!');
+                return;
+            }
+            
+            const player = game.players[game.activePlayer];
+            if (cardIndex >= player.hand.length) return;
+            
+            const card = player.hand[cardIndex];
+            
+            if (card.type !== 'Action' || !card.enhances || card.enhances.length === 0) {
+                alert('Card is not an action with enhance abilities!');
+                return;
+            }
+            
+            const enhanceAbility = card.enhances[0];
+            const attack = game.attackSequence.currentAttack;
+            
+            // Parse and apply the enhance effect
+            if (enhanceAbility.includes('+1 damage')) {
+                game.attackSequence.damageModifier += 1;
+                const newDamage = getCardDamage(attack) + game.attackSequence.damageModifier;
+                alert(`Player ${game.activePlayer + 1} uses ${card.name}!\n${attack.name} gets +1 damage! (Now ${newDamage} damage)`);
+            } else if (enhanceAbility.includes('+2 damage')) {
+                game.attackSequence.damageModifier += 2;
+                const newDamage = getCardDamage(attack) + game.attackSequence.damageModifier;
+                alert(`Player ${game.activePlayer + 1} uses ${card.name}!\n${attack.name} gets +2 damage! (Now ${newDamage} damage)`);
+            } else if (enhanceAbility.includes('-1 speed')) {
+                game.attackSequence.speedModifier -= 1;
+                const newSpeed = Math.max(1, getCardSpeed(attack) + game.attackSequence.speedModifier);
+                alert(`Player ${game.activePlayer + 1} uses ${card.name}!\n${attack.name} gets -1 speed! (Now Speed ${newSpeed})`);
+            } else if (enhanceAbility.includes('+1 speed')) {
+                game.attackSequence.speedModifier += 1;
+                const newSpeed = getCardSpeed(attack) + game.attackSequence.speedModifier;
+                alert(`Player ${game.activePlayer + 1} uses ${card.name}!\n${attack.name} gets +1 speed! (Now Speed ${newSpeed})`);
+            } else if (enhanceAbility.includes('Discard the top 4 cards')) {
+                // Handle the specific enhance: "Discard the top 4 cards of your deck: Add 1 Ranged attack discarded this way to your hand."
+                if (player.deck.length >= 4) {
+                    const discardedCards = player.deck.splice(0, 4);
+                    player.discard.push(...discardedCards);
+                    
+                    // Find Ranged attacks among discarded cards
+                    const rangedAttacks = discardedCards.filter(card => 
+                        card.type === 'Attack' && getCardZone(card) === 'Ranged'
+                    );
+                    
+                    if (rangedAttacks.length > 0) {
+                        // Add the first Ranged attack to hand
+                        const rangedAttack = rangedAttacks[0];
+                        player.hand.push(rangedAttack);
+                        alert(`Player ${game.activePlayer + 1} uses ${card.name}!\nDiscarded 4 cards. Found ${rangedAttacks.length} Ranged attack(s). Added ${rangedAttack.name} to hand.`);
+                    } else {
+                        alert(`Player ${game.activePlayer + 1} uses ${card.name}!\nDiscarded 4 cards. No Ranged attacks found.`);
+                    }
+                } else {
+                    alert('Not enough cards in deck to use this enhance!');
+                    return;
+                }
+            } else if (enhanceAbility.includes('Shuffle up to 3 cards')) {
+                // Handle Expert Archery enhance: "E Flip: Shuffle up to 3 cards in either player's discard pile back into their deck."
+                const currentPlayer = game.players[game.activePlayer];
+                const otherPlayer = game.players[(game.activePlayer + 1) % 2];
+                
+                // For now, shuffle 3 cards from current player's discard back to deck
+                const cardsToShuffle = Math.min(3, currentPlayer.discard.length);
+                if (cardsToShuffle > 0) {
+                    const shuffledCards = currentPlayer.discard.splice(-cardsToShuffle);
+                    currentPlayer.deck.push(...shuffledCards);
+                    
+                    // Shuffle the deck
+                    for (let i = currentPlayer.deck.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [currentPlayer.deck[i], currentPlayer.deck[j]] = [currentPlayer.deck[j], currentPlayer.deck[i]];
+                    }
+                    
+                    alert(`Player ${game.activePlayer + 1} uses ${card.name}!\nShuffled ${cardsToShuffle} cards from discard pile back into deck.`);
+                } else {
+                    alert('No cards in discard pile to shuffle!');
+                    return;
+                }
+            } else if (enhanceAbility.includes('Your next check to play a card gets +1')) {
+                // Handle Expert Archery enhance: "E Flip: Your next check to play a card gets +1. If that card is a Ranged attack it gets +2 instead."
+                // Store this effect for the next check
+                if (!game.nextCheckBonus) {
+                    game.nextCheckBonus = {};
+                }
+                game.nextCheckBonus[game.activePlayer] = {
+                    bonus: 1,
+                    rangedBonus: 2,
+                    source: card.name
+                };
+                
+                alert(`Player ${game.activePlayer + 1} uses ${card.name}!\nNext check to play a card gets +1. If it's a Ranged attack, it gets +2 instead.`);
+            } else if (enhanceAbility.includes('add the top card of your deck to your momentum')) {
+                // Handle momentum effects like Crowd's Darling: "Enhance Commit: If your attack deals damage, add the top card of your deck to your momentum."
+                // Store this as a conditional effect that triggers when damage is dealt
+                if (!game.conditionalEffects) {
+                    game.conditionalEffects = {};
+                }
+                if (!game.conditionalEffects[game.activePlayer]) {
+                    game.conditionalEffects[game.activePlayer] = [];
+                }
+                
+                game.conditionalEffects[game.activePlayer].push({
+                    type: 'addToMomentum',
+                    condition: 'attackDealsDamage',
+                    source: card.name,
+                    effect: 'addTopCardToMomentum'
+                });
+                
+                alert(`Player ${game.activePlayer + 1} uses ${card.name}!\nIf the attack deals damage, the top card of your deck will be added to your momentum.`);
+            } else if (enhanceAbility.includes('add 1 card from your momentum to your hand')) {
+                // Handle momentum to hand effects like Hungry for Fame: "Enhance Commit, flip: Add 1 card from your momentum to your hand."
+                if (player.momentum.length > 0) {
+                    const momentumCard = player.momentum.pop(); // Remove from momentum
+                    player.hand.push(momentumCard); // Add to hand
+                    alert(`Player ${game.activePlayer + 1} uses ${card.name}!\nAdded ${momentumCard.name} from momentum to hand.`);
+                } else {
+                    alert('No cards in momentum to add to hand!');
+                    return;
+                }
+            } else if (enhanceAbility.includes('draw 1 card') || enhanceAbility.includes('Draw 1 card')) {
+                // Handle draw effects
+                if (player.deck.length > 0) {
+                    const drawnCard = player.deck.pop();
+                    player.hand.push(drawnCard);
+                    alert(`Player ${game.activePlayer + 1} uses ${card.name}!\nDrew 1 card: ${drawnCard.name}`);
+                } else {
+                    alert('No cards in deck to draw!');
+                    return;
+                }
+            } else {
+                // Generic enhance effect
+                alert(`Player ${game.activePlayer + 1} uses ${card.name}!\nEnhance effect: ${enhanceAbility}`);
+            }
+            
+            // Remove the action card from hand (it's used as an enhance)
+            player.hand.splice(cardIndex, 1);
+            
+            // Switch to other player immediately
+            const previousPlayer = game.attackSequence.currentEnhancePlayer;
+            game.attackSequence.currentEnhancePlayer = (game.attackSequence.currentEnhancePlayer + 1) % 2;
+            game.attackSequence.enhancePasses = 0; // Reset passes
+            
+            updateDisplay();
+            alert(`Player ${previousPlayer + 1} used ${card.name}!\nNow Player ${game.attackSequence.currentEnhancePlayer + 1}'s turn to enhance or pass.`);
         }
 
         function distributeCardPool(playerIndex) {
@@ -433,7 +1030,6 @@
                         distribution.foundations.push(card);
                         break;
                     case 'Attack':
-                        // For now, assume attacks deal base damage (we'll add block/damage calculation later)
                         distribution.attacks.push(card);
                         break;
                     case 'Action':
@@ -455,8 +1051,18 @@
                 player.foundations.push(foundation);
             });
             
-            // Attacks that dealt damage go to momentum (for now, all attacks)
-            player.momentum.push(...distribution.attacks);
+            // Attacks that dealt damage go to momentum, others go to discard
+            distribution.attacks.forEach(attack => {
+                // Check if this attack dealt damage by looking at recent attack sequence
+                if (game.attackSequence && 
+                    game.attackSequence.currentAttack && 
+                    game.attackSequence.currentAttack.id === attack.id &&
+                    game.attackSequence.damageDealt > 0) {
+                    player.momentum.push(attack);
+                } else {
+                    player.discard.push(attack);
+                }
+            });
             
             // Actions go to discard
             player.discard.push(...distribution.actions);
@@ -481,6 +1087,558 @@
             alert(`Turn End - Card Distribution:\n${results.join('\n')}`);
         }
 
+        function startAttackSequence(attackCard) {
+            game.attackSequence.active = true;
+            game.attackSequence.currentAttack = attackCard;
+            game.attackSequence.currentStep = 'Enhance';
+            game.attackSequence.attackingPlayer = game.activePlayer;
+            game.attackSequence.defendingPlayer = (game.activePlayer + 1) % 2;
+            game.attackSequence.enhancePasses = 0;
+            game.attackSequence.currentEnhancePlayer = game.activePlayer; // Attacking player goes first
+            game.attackSequence.damageDealt = 0; // Initialize damage dealt
+            game.attackSequence.damageModifier = 0; // Initialize damage modifier
+            game.attackSequence.speedModifier = 0; // Initialize speed modifier
+            
+            updateDisplay();
+            alert(`Attack Sequence Started!\n${attackCard.name} (${getCardDamage(attackCard)} damage, Speed ${getCardSpeed(attackCard)}, ${getCardZone(attackCard)} zone)\nEnhance Step - Attacking player's turn`);
+        }
+
+        function useFoundationEnhance(playerIndex, foundationIndex) {
+            if (!game.attackSequence.active || game.attackSequence.currentStep !== 'Enhance') {
+                alert('No enhance step active!');
+                return;
+            }
+            
+            if (game.attackSequence.currentEnhancePlayer !== playerIndex) {
+                alert('Not your turn to enhance!');
+                return;
+            }
+            
+            const player = game.players[playerIndex];
+            const attack = game.attackSequence.currentAttack;
+            
+            if (foundationIndex >= player.foundations.length) {
+                alert('Invalid foundation!');
+                return;
+            }
+            
+            const foundation = player.foundations[foundationIndex];
+            
+            if (foundation.committed) {
+                alert('Foundation is already committed!');
+                return;
+            }
+            
+            if (!foundation.enhances || foundation.enhances.length === 0) {
+                alert('Foundation has no enhance abilities!');
+                return;
+            }
+            
+            const enhanceAbility = foundation.enhances[0];
+            
+            // Parse and apply the enhance effect
+            if (enhanceAbility.includes('+1 damage')) {
+                game.attackSequence.damageModifier += 1;
+                const newDamage = getCardDamage(attack) + game.attackSequence.damageModifier;
+                alert(`Player ${playerIndex + 1} uses ${foundation.name}!\n${attack.name} gets +1 damage! (Now ${newDamage} damage)`);
+            } else if (enhanceAbility.includes('+2 damage')) {
+                game.attackSequence.damageModifier += 2;
+                const newDamage = getCardDamage(attack) + game.attackSequence.damageModifier;
+                alert(`Player ${playerIndex + 1} uses ${foundation.name}!\n${attack.name} gets +2 damage! (Now ${newDamage} damage)`);
+            } else if (enhanceAbility.includes('-1 speed')) {
+                game.attackSequence.speedModifier -= 1;
+                const newSpeed = Math.max(1, getCardSpeed(attack) + game.attackSequence.speedModifier); // Speed can't go below 1
+                alert(`Player ${playerIndex + 1} uses ${foundation.name}!\n${attack.name} gets -1 speed! (Now Speed ${newSpeed})`);
+            } else if (enhanceAbility.includes('+1 speed')) {
+                game.attackSequence.speedModifier += 1;
+                const newSpeed = getCardSpeed(attack) + game.attackSequence.speedModifier;
+                alert(`Player ${playerIndex + 1} uses ${foundation.name}!\n${attack.name} gets +1 speed! (Now Speed ${newSpeed})`);
+            } else if (enhanceAbility.includes('Shuffle up to 3 cards')) {
+                // Handle Expert Archery enhance: "E Flip: Shuffle up to 3 cards in either player's discard pile back into their deck."
+                const currentPlayer = game.players[playerIndex];
+                const otherPlayer = game.players[(playerIndex + 1) % 2];
+                
+                // For now, shuffle 3 cards from current player's discard back to deck
+                const cardsToShuffle = Math.min(3, currentPlayer.discard.length);
+                if (cardsToShuffle > 0) {
+                    const shuffledCards = currentPlayer.discard.splice(-cardsToShuffle);
+                    currentPlayer.deck.push(...shuffledCards);
+                    
+                    // Shuffle the deck
+                    for (let i = currentPlayer.deck.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [currentPlayer.deck[i], currentPlayer.deck[j]] = [currentPlayer.deck[j], currentPlayer.deck[i]];
+                    }
+                    
+                    alert(`Player ${playerIndex + 1} uses ${foundation.name}!\nShuffled ${cardsToShuffle} cards from discard pile back into deck.`);
+                } else {
+                    alert('No cards in discard pile to shuffle!');
+                    return;
+                }
+            } else if (enhanceAbility.includes('Your next check to play a card gets +1')) {
+                // Handle Expert Archery enhance: "E Flip: Your next check to play a card gets +1. If that card is a Ranged attack it gets +2 instead."
+                // Store this effect for the next check
+                if (!game.nextCheckBonus) {
+                    game.nextCheckBonus = {};
+                }
+                game.nextCheckBonus[playerIndex] = {
+                    bonus: 1,
+                    rangedBonus: 2,
+                    source: foundation.name
+                };
+                
+                alert(`Player ${playerIndex + 1} uses ${foundation.name}!\nNext check to play a card gets +1. If it's a Ranged attack, it gets +2 instead.`);
+            } else if (enhanceAbility.includes('add the top card of your deck to your momentum')) {
+                // Handle momentum effects like Crowd's Darling: "Enhance Commit: If your attack deals damage, add the top card of your deck to your momentum."
+                // Store this as a conditional effect that triggers when damage is dealt
+                if (!game.conditionalEffects) {
+                    game.conditionalEffects = {};
+                }
+                if (!game.conditionalEffects[playerIndex]) {
+                    game.conditionalEffects[playerIndex] = [];
+                }
+                
+                game.conditionalEffects[playerIndex].push({
+                    type: 'addToMomentum',
+                    condition: 'attackDealsDamage',
+                    source: foundation.name,
+                    effect: 'addTopCardToMomentum'
+                });
+                
+                alert(`Player ${playerIndex + 1} uses ${foundation.name}!\nIf the attack deals damage, the top card of your deck will be added to your momentum.`);
+            } else if (enhanceAbility.includes('add 1 card from your momentum to your hand')) {
+                // Handle momentum to hand effects like Hungry for Fame: "Enhance Commit, flip: Add 1 card from your momentum to your hand."
+                if (player.momentum.length > 0) {
+                    const momentumCard = player.momentum.pop(); // Remove from momentum
+                    player.hand.push(momentumCard); // Add to hand
+                    alert(`Player ${playerIndex + 1} uses ${foundation.name}!\nAdded ${momentumCard.name} from momentum to hand.`);
+                } else {
+                    alert('No cards in momentum to add to hand!');
+                    return;
+                }
+            } else if (enhanceAbility.includes('draw 1 card') || enhanceAbility.includes('Draw 1 card')) {
+                // Handle draw effects
+                if (player.deck.length > 0) {
+                    const drawnCard = player.deck.pop();
+                    player.hand.push(drawnCard);
+                    alert(`Player ${playerIndex + 1} uses ${foundation.name}!\nDrew 1 card: ${drawnCard.name}`);
+                } else {
+                    alert('No cards in deck to draw!');
+                    return;
+                }
+            }
+            
+            // Commit the foundation
+            foundation.committed = true;
+            
+            // Switch to other player immediately
+            const previousPlayer = game.attackSequence.currentEnhancePlayer;
+            game.attackSequence.currentEnhancePlayer = (game.attackSequence.currentEnhancePlayer + 1) % 2;
+            game.attackSequence.enhancePasses = 0; // Reset passes
+            
+            updateDisplay();
+            alert(`Player ${previousPlayer + 1} used ${foundation.name}!\nNow Player ${game.attackSequence.currentEnhancePlayer + 1}'s turn to enhance or pass.`);
+        }
+
+        function useCardPoolEnhance(playerIndex, cardIndex) {
+            if (!game.attackSequence.active || game.attackSequence.currentStep !== 'Enhance') {
+                alert('No enhance step active!');
+                return;
+            }
+            
+            if (game.attackSequence.currentEnhancePlayer !== playerIndex) {
+                alert('Not your turn to enhance!');
+                return;
+            }
+            
+            const player = game.players[playerIndex];
+            const attack = game.attackSequence.currentAttack;
+            
+            if (cardIndex >= player.cardPool.length) {
+                alert('Invalid card!');
+                return;
+            }
+            
+            const card = player.cardPool[cardIndex];
+            
+            if (!card.enhances || card.enhances.length === 0) {
+                alert('Card has no enhance abilities!');
+                return;
+            }
+            
+            if (card.type !== 'Attack' && card.type !== 'Action') {
+                alert('Only attacks and actions in the card pool can use enhances!');
+                return;
+            }
+            
+            const enhanceAbility = card.enhances[0];
+            
+            // Parse and apply the enhance effect
+            if (enhanceAbility.includes('+1 damage')) {
+                game.attackSequence.damageModifier += 1;
+                const newDamage = getCardDamage(attack) + game.attackSequence.damageModifier;
+                alert(`Player ${playerIndex + 1} uses ${card.name}!\n${attack.name} gets +1 damage! (Now ${newDamage} damage)`);
+            } else if (enhanceAbility.includes('+2 damage')) {
+                game.attackSequence.damageModifier += 2;
+                const newDamage = getCardDamage(attack) + game.attackSequence.damageModifier;
+                alert(`Player ${playerIndex + 1} uses ${card.name}!\n${attack.name} gets +2 damage! (Now ${newDamage} damage)`);
+            } else if (enhanceAbility.includes('-1 speed')) {
+                game.attackSequence.speedModifier -= 1;
+                const newSpeed = Math.max(1, getCardSpeed(attack) + game.attackSequence.speedModifier); // Speed can't go below 1
+                alert(`Player ${playerIndex + 1} uses ${card.name}!\n${attack.name} gets -1 speed! (Now Speed ${newSpeed})`);
+            } else if (enhanceAbility.includes('+1 speed')) {
+                game.attackSequence.speedModifier += 1;
+                const newSpeed = getCardSpeed(attack) + game.attackSequence.speedModifier;
+                alert(`Player ${playerIndex + 1} uses ${card.name}!\n${attack.name} gets +1 speed! (Now Speed ${newSpeed})`);
+            } else if (enhanceAbility.includes('Shuffle up to 3 cards')) {
+                // Handle Expert Archery enhance: "E Flip: Shuffle up to 3 cards in either player's discard pile back into their deck."
+                const currentPlayer = game.players[playerIndex];
+                const otherPlayer = game.players[(playerIndex + 1) % 2];
+                
+                // For now, shuffle 3 cards from current player's discard back to deck
+                const cardsToShuffle = Math.min(3, currentPlayer.discard.length);
+                if (cardsToShuffle > 0) {
+                    const shuffledCards = currentPlayer.discard.splice(-cardsToShuffle);
+                    currentPlayer.deck.push(...shuffledCards);
+                    
+                    // Shuffle the deck
+                    for (let i = currentPlayer.deck.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [currentPlayer.deck[i], currentPlayer.deck[j]] = [currentPlayer.deck[j], currentPlayer.deck[i]];
+                    }
+                    
+                    alert(`Player ${playerIndex + 1} uses ${card.name}!\nShuffled ${cardsToShuffle} cards from discard pile back into deck.`);
+                } else {
+                    alert('No cards in discard pile to shuffle!');
+                    return;
+                }
+            } else if (enhanceAbility.includes('Your next check to play a card gets +1')) {
+                // Handle Expert Archery enhance: "E Flip: Your next check to play a card gets +1. If that card is a Ranged attack it gets +2 instead."
+                // Store this effect for the next check
+                if (!game.nextCheckBonus) {
+                    game.nextCheckBonus = {};
+                }
+                game.nextCheckBonus[playerIndex] = {
+                    bonus: 1,
+                    rangedBonus: 2,
+                    source: card.name
+                };
+                
+                alert(`Player ${playerIndex + 1} uses ${card.name}!\nNext check to play a card gets +1. If it's a Ranged attack, it gets +2 instead.`);
+            } else if (enhanceAbility.includes('add the top card of your deck to your momentum')) {
+                // Handle momentum effects like Crowd's Darling: "Enhance Commit: If your attack deals damage, add the top card of your deck to your momentum."
+                // Store this as a conditional effect that triggers when damage is dealt
+                if (!game.conditionalEffects) {
+                    game.conditionalEffects = {};
+                }
+                if (!game.conditionalEffects[playerIndex]) {
+                    game.conditionalEffects[playerIndex] = [];
+                }
+                
+                game.conditionalEffects[playerIndex].push({
+                    type: 'addToMomentum',
+                    condition: 'attackDealsDamage',
+                    source: card.name,
+                    effect: 'addTopCardToMomentum'
+                });
+                
+                alert(`Player ${playerIndex + 1} uses ${card.name}!\nIf the attack deals damage, the top card of your deck will be added to your momentum.`);
+            } else if (enhanceAbility.includes('add 1 card from your momentum to your hand')) {
+                // Handle momentum to hand effects like Hungry for Fame: "Enhance Commit, flip: Add 1 card from your momentum to your hand."
+                if (player.momentum.length > 0) {
+                    const momentumCard = player.momentum.pop(); // Remove from momentum
+                    player.hand.push(momentumCard); // Add to hand
+                    alert(`Player ${playerIndex + 1} uses ${card.name}!\nAdded ${momentumCard.name} from momentum to hand.`);
+                } else {
+                    alert('No cards in momentum to add to hand!');
+                    return;
+                }
+            } else if (enhanceAbility.includes('draw 1 card') || enhanceAbility.includes('Draw 1 card')) {
+                // Handle draw effects
+                if (player.deck.length > 0) {
+                    const drawnCard = player.deck.pop();
+                    player.hand.push(drawnCard);
+                    alert(`Player ${playerIndex + 1} uses ${card.name}!\nDrew 1 card: ${drawnCard.name}`);
+                } else {
+                    alert('No cards in deck to draw!');
+                    return;
+                }
+            } else if (enhanceAbility.includes('Discard the top 4 cards')) {
+                // Handle the specific enhance: "Discard the top 4 cards of your deck: Add 1 Ranged attack discarded this way to your hand."
+                if (player.deck.length >= 4) {
+                    const discardedCards = player.deck.splice(0, 4);
+                    player.discard.push(...discardedCards);
+                    
+                    // Find Ranged attacks among discarded cards
+                    const rangedAttacks = discardedCards.filter(card => 
+                        card.type === 'Attack' && getCardZone(card) === 'Ranged'
+                    );
+                    
+                    if (rangedAttacks.length > 0) {
+                        // Add the first Ranged attack to hand
+                        const rangedAttack = rangedAttacks[0];
+                        player.hand.push(rangedAttack);
+                        alert(`Player ${playerIndex + 1} uses ${card.name}!\nDiscarded 4 cards. Found ${rangedAttacks.length} Ranged attack(s). Added ${rangedAttack.name} to hand.`);
+                    } else {
+                        alert(`Player ${playerIndex + 1} uses ${card.name}!\nDiscarded 4 cards. No Ranged attacks found.`);
+                    }
+                } else {
+                    alert('Not enough cards in deck to use this enhance!');
+                    return;
+                }
+            } else {
+                // Generic enhance effect
+                alert(`Player ${playerIndex + 1} uses ${card.name}!\nEnhance effect: ${enhanceAbility}`);
+            }
+            
+            // Switch to other player immediately
+            const previousPlayer = game.attackSequence.currentEnhancePlayer;
+            game.attackSequence.currentEnhancePlayer = (game.attackSequence.currentEnhancePlayer + 1) % 2;
+            game.attackSequence.enhancePasses = 0; // Reset passes
+            
+            updateDisplay();
+            alert(`Player ${previousPlayer + 1} used ${card.name}!\nNow Player ${game.attackSequence.currentEnhancePlayer + 1}'s turn to enhance or pass.`);
+        }
+
+        function passEnhance() {
+            if (!game.attackSequence.active || game.attackSequence.currentStep !== 'Enhance') {
+                alert('No enhance step active!');
+                return;
+            }
+            
+            // During attack sequence, the current enhance player can pass
+            // We don't need to check against game.activePlayer since this is a separate sequence
+            // Just make sure we're in the enhance step
+            
+            game.attackSequence.enhancePasses++;
+            
+            if (game.attackSequence.enhancePasses >= 2) {
+                // Both players passed consecutively, move to Block Step
+                alert('Both players passed. Moving to Block Step!');
+                startBlockStep();
+            } else {
+                // Switch to other player
+                game.attackSequence.currentEnhancePlayer = (game.attackSequence.currentEnhancePlayer + 1) % 2;
+                updateDisplay();
+                alert(`Player ${game.attackSequence.currentEnhancePlayer + 1}'s turn to enhance or pass`);
+            }
+        }
+
+        function startBlockStep() {
+            game.attackSequence.currentStep = 'Block';
+            game.attackSequence.blockAttempted = false;
+            game.attackSequence.blockSuccess = false;
+            game.attackSequence.blockCard = null;
+            game.attackSequence.blockZone = null;
+            
+            const attack = game.attackSequence.currentAttack;
+            const defendingPlayer = game.attackSequence.defendingPlayer;
+            
+            updateDisplay();
+            alert(`Block Step!\nDefending player (${defendingPlayer + 1}) may attempt to block ${attack.name}\nAttack: ${attack.damage} damage, Speed ${attack.speed}, ${attack.zone} zone`);
+        }
+        
+        function attemptBlock(cardIndex) {
+            if (!game.attackSequence.active || game.attackSequence.currentStep !== 'Block') {
+                alert('No block step active!');
+                return;
+            }
+            
+            if (game.attackSequence.blockAttempted) {
+                alert('Block already attempted!');
+                return;
+            }
+            
+            const defendingPlayer = game.attackSequence.defendingPlayer;
+            const attackingPlayer = game.attackSequence.attackingPlayer;
+            const blockCard = game.players[defendingPlayer].hand[cardIndex];
+            const attackCard = game.attackSequence.currentAttack;
+            
+            // Check if block zone is compatible with attack zone
+            if (!canBlock(getCardZone(attackCard), getCardBlockZone(blockCard))) {
+                alert(`Cannot block ${getCardZone(attackCard)} attack with ${getCardBlockZone(blockCard)} block!`);
+                return;
+            }
+            
+            // Move block card to card pool
+            game.players[defendingPlayer].hand.splice(cardIndex, 1);
+            game.players[defendingPlayer].cardPool.push(blockCard);
+            
+            // Calculate block difficulty using modified speed
+            const currentSpeed = getCardSpeed(attackCard) + (game.attackSequence.speedModifier || 0);
+            const blockDifficulty = currentSpeed + getCardBlock(blockCard) + game.players[defendingPlayer].cardPool.length - 1; // -1 because we just added the block card
+            
+            // Perform block check
+            const checkCard = game.players[defendingPlayer].deck.pop();
+            game.players[defendingPlayer].discard.push(checkCard);
+            
+            const blockSuccess = (checkCard.control || checkCard.check || 0) >= blockDifficulty;
+            
+            if (blockSuccess) {
+                alert(`Block successful! Check: ${checkCard.control || checkCard.check || 0} vs Difficulty: ${blockDifficulty}`);
+                game.attackSequence.blockSuccess = true;
+                game.attackSequence.blockCard = blockCard;
+                game.attackSequence.blockZone = getCardBlockZone(blockCard);
+                game.attackSequence.blockAttempted = true;
+                updateDisplay();
+                
+                // Move to Damage Step
+                setTimeout(() => {
+                    startDamageStep();
+                }, 1000);
+            } else {
+                // Block check failed - allow foundation commitment
+                const shortfall = blockDifficulty - (checkCard.control || checkCard.check || 0);
+                const availableFoundations = game.players[defendingPlayer].foundations.filter(f => !f.committed);
+                
+                if (availableFoundations.length >= shortfall) {
+                    // Can commit enough foundations to pass the block
+                    const foundationsToCommit = availableFoundations.slice(0, shortfall);
+                    foundationsToCommit.forEach(f => f.committed = true);
+                    
+                    alert(`Block check failed! ${checkCard.name} (${checkCard.control || checkCard.check || 0}) < ${blockDifficulty}. Committed ${shortfall} foundations. Block successful!`);
+                    game.attackSequence.blockSuccess = true;
+                    game.attackSequence.blockCard = blockCard;
+                    game.attackSequence.blockZone = getCardBlockZone(blockCard);
+                    game.attackSequence.blockAttempted = true;
+                    updateDisplay();
+                    
+                    // Move to Damage Step
+                    setTimeout(() => {
+                        startDamageStep();
+                    }, 1000);
+                } else {
+                    // Cannot pass the block check - block fails
+                    alert(`Block check failed! ${checkCard.name} (${checkCard.control || checkCard.check || 0}) < ${blockDifficulty}. Need ${shortfall} foundations but only have ${availableFoundations.length} available. Block fails!`);
+                    
+                    // Remove failed block from card pool and add to discard
+                    game.players[defendingPlayer].cardPool.pop();
+                    game.players[defendingPlayer].discard.push(blockCard);
+                    game.attackSequence.blockAttempted = true;
+                    updateDisplay();
+                    
+                    // Move to Damage Step
+                    setTimeout(() => {
+                        startDamageStep();
+                    }, 1000);
+                }
+            }
+        }
+        
+        function canBlock(attackZone, blockZone) {
+            // High and Mid zones are adjacent
+            // Low and Mid zones are adjacent
+            // Mid zone is adjacent to both High and Low zones
+            // High and Low zones are NOT adjacent zones
+            
+            if (attackZone === blockZone) return true; // Same zone = full block
+            
+            if (attackZone === 'Mid' || blockZone === 'Mid') return true; // Mid is adjacent to everything
+            
+            return false; // High and Low are not adjacent
+        }
+        
+        function startDamageStep() {
+            game.attackSequence.currentStep = 'Damage';
+            updateDisplay();
+            
+            const attackingPlayer = game.attackSequence.attackingPlayer;
+            const defendingPlayer = game.attackSequence.defendingPlayer;
+            const attackCard = game.attackSequence.currentAttack;
+            
+            let damageDealt = getCardDamage(attackCard) + (game.attackSequence.damageModifier || 0);
+            let damageMessage = `Attack deals ${damageDealt} damage.`;
+            
+            if (game.attackSequence.blockSuccess) {
+                const attackZone = getCardZone(attackCard);
+                const blockZone = game.attackSequence.blockZone;
+                
+                if (attackZone === blockZone) {
+                    damageDealt = 0;
+                    damageMessage = `Attack completely blocked! No damage dealt.`;
+                } else {
+                    damageDealt = Math.ceil(damageDealt / 2);
+                    damageMessage = `Attack partially blocked! ${damageDealt} damage dealt (half damage, rounded up).`;
+                }
+            }
+            
+            // Store damage dealt for card distribution
+            game.attackSequence.damageDealt = damageDealt;
+            
+            // Apply damage
+            game.players[defendingPlayer].health -= damageDealt;
+            
+            // Trigger conditional effects if damage was dealt
+            if (damageDealt > 0 && game.conditionalEffects) {
+                const attackingPlayer = game.attackSequence.attackingPlayer;
+                if (game.conditionalEffects[attackingPlayer]) {
+                    const effectsToProcess = [...game.conditionalEffects[attackingPlayer]];
+                    game.conditionalEffects[attackingPlayer] = []; // Clear the effects
+                    
+                    effectsToProcess.forEach(effect => {
+                        if (effect.condition === 'attackDealsDamage' && effect.effect === 'addTopCardToMomentum') {
+                            const player = game.players[attackingPlayer];
+                            if (player.deck.length > 0) {
+                                const topCard = player.deck.pop();
+                                player.momentum.push(topCard);
+                                alert(`Conditional effect triggered! ${topCard.name} added to momentum from ${effect.source}.`);
+                            }
+                        }
+                    });
+                }
+            }
+            
+            alert(damageMessage);
+            
+            // End attack sequence
+            setTimeout(() => {
+                endAttackSequence();
+            }, 1000);
+        }
+        
+        function passBlock() {
+            if (!game.attackSequence.active || game.attackSequence.currentStep !== 'Block') {
+                alert('No block step active!');
+                return;
+            }
+            
+            if (game.attackSequence.blockAttempted) {
+                alert('Block already attempted!');
+                return;
+            }
+            
+            game.attackSequence.blockAttempted = true;
+            game.attackSequence.blockSuccess = false;
+            
+            alert('Defending player chose not to block.');
+            updateDisplay();
+            
+            // Move to Damage Step
+            setTimeout(() => {
+                startDamageStep();
+            }, 1000);
+        }
+        
+        function endAttackSequence() {
+            game.attackSequence.active = false;
+            game.attackSequence.currentStep = null;
+            game.attackSequence.currentAttack = null;
+            game.attackSequence.attackingPlayer = null;
+            game.attackSequence.defendingPlayer = null;
+            game.attackSequence.enhancePasses = 0;
+            game.attackSequence.currentEnhancePlayer = null;
+            game.attackSequence.blockAttempted = false;
+            game.attackSequence.blockSuccess = false;
+            game.attackSequence.blockCard = null;
+            game.attackSequence.blockZone = null;
+            game.attackSequence.damageDealt = 0;
+            game.attackSequence.damageModifier = 0;
+            game.attackSequence.speedModifier = 0;
+            
+            updateDisplay();
+            alert('Attack sequence ended. Return to Combat Phase.');
+        }
+
         function commitFoundation(foundationIndex) {
             if (!game.gameStarted) return;
             
@@ -496,8 +1654,17 @@
         function endTurn() {
             if (!game.gameStarted) return;
             
-            // Distribute cards from card pool
+            // Distribute cards from active player's card pool
             distributeCardPool(game.activePlayer);
+            
+            // Clear defending player's card pool (blocks, etc.) to discard
+            const defendingPlayer = (game.activePlayer + 1) % 2;
+            const defendingPlayerCards = game.players[defendingPlayer].cardPool;
+            if (defendingPlayerCards.length > 0) {
+                game.players[defendingPlayer].discard.push(...defendingPlayerCards);
+                game.players[defendingPlayer].cardPool = [];
+                alert(`Defending player's card pool cleared: ${defendingPlayerCards.length} cards moved to discard pile.`);
+            }
             
             // Switch to next player
             nextTurn();
@@ -528,6 +1695,24 @@
         function nextTurn() {
             if (!game.gameStarted) return;
             
+            // Clear any active attack sequence when turn ends
+            if (game.attackSequence.active) {
+                game.attackSequence.active = false;
+                game.attackSequence.currentStep = null;
+                game.attackSequence.currentAttack = null;
+                game.attackSequence.attackingPlayer = null;
+                game.attackSequence.defendingPlayer = null;
+                game.attackSequence.enhancePasses = 0;
+                game.attackSequence.currentEnhancePlayer = null;
+                game.attackSequence.blockAttempted = false;
+                game.attackSequence.blockSuccess = false;
+                game.attackSequence.blockCard = null;
+                game.attackSequence.blockZone = null;
+                game.attackSequence.damageDealt = 0;
+                game.attackSequence.damageModifier = 0;
+                game.attackSequence.speedModifier = 0;
+            }
+            
             game.activePlayer = (game.activePlayer + 1) % 2;
             game.turn++;
             game.phase = 'Start';
@@ -554,8 +1739,15 @@
             game.activePlayer = 0;
             game.phase = 'Start';
             game.step = 'Ready';
+            game.mulliganPhase = false;
+            game.currentMulliganPlayer = 0;
             game.players.forEach(player => {
-                player.health = 20;
+                // Keep the character's vitality as health, or default to 20 if no character
+                if (player.character && player.character.length > 0) {
+                    player.health = player.character[0].health;
+                } else {
+                    player.health = 20;
+                }
                 player.deck = [];
                 player.hand = [];
                 player.cardPool = [];
@@ -567,7 +1759,12 @@
                 player.character = [];
                 player.foundations = [];
                 player.handSize = 7; // Reset hand size
+                player.mulliganUsed = false;
             });
+            
+            // Hide mulligan buttons
+            document.getElementById('mulligan-btn').style.display = 'none';
+            document.getElementById('keep-hand-btn').style.display = 'none';
             
             updateDisplay();
         }
@@ -579,10 +1776,48 @@
             document.getElementById('active-player').textContent = game.activePlayer + 1;
             document.getElementById('step').textContent = game.step;
             
+            // Update health displays
+            updateHealthDisplay();
+            
+            // Update attack sequence controls
+            const attackControls = document.querySelector('.attack-sequence-controls');
+            if (game.attackSequence.active) {
+                attackControls.style.display = 'flex';
+                attackControls.style.gap = '10px';
+                
+                const enhanceButton = attackControls.querySelector('button:first-child');
+                const blockButton = attackControls.querySelector('button:last-child');
+                
+                if (game.attackSequence.currentStep === 'Enhance') {
+                    enhanceButton.style.display = 'inline-block';
+                    blockButton.style.display = 'none';
+                    
+                    // Show whose turn it is to enhance
+                    const currentEnhancePlayer = game.attackSequence.currentEnhancePlayer;
+                    enhanceButton.textContent = `Player ${currentEnhancePlayer + 1} - Pass Enhance`;
+                } else if (game.attackSequence.currentStep === 'Block') {
+                    enhanceButton.style.display = 'none';
+                    blockButton.style.display = 'inline-block';
+                    blockButton.textContent = 'Pass Block';
+                } else {
+                    enhanceButton.style.display = 'none';
+                    blockButton.style.display = 'none';
+                }
+            } else {
+                attackControls.style.display = 'none';
+            }
+            
             // Update player areas
             game.players.forEach((player, index) => {
                 const playerArea = document.getElementById(`player${index + 1}`);
-                playerArea.classList.toggle('active', index === game.activePlayer);
+                
+                // During attack sequence, highlight the current enhance player
+                // Otherwise, highlight the active player
+                if (game.attackSequence.active && game.attackSequence.currentStep === 'Enhance') {
+                    playerArea.classList.toggle('active', index === game.attackSequence.currentEnhancePlayer);
+                } else {
+                    playerArea.classList.toggle('active', index === game.activePlayer);
+                }
                 
                 // Update zone counts
                 document.getElementById(`p${index + 1}-deck-count`).textContent = player.deck.length;
@@ -609,14 +1844,101 @@
             
             // Update hand display
             const handCards = document.getElementById('hand-cards');
-            if (game.gameStarted && game.players[game.activePlayer].hand.length > 0) {
-                handCards.innerHTML = game.players[game.activePlayer].hand.map((card, index) => 
-                    `<div class="hand-card" onclick="playCard(${index})">
-                        <div style="font-weight: bold;">${card.name}</div>
-                        <div style="font-size: 10px;">${card.type}</div>
-                        <div style="font-size: 9px;">D:${card.difficulty} C:${card.check}</div>
-                    </div>`
-                ).join('');
+            const handLabelElement = document.getElementById('hand-label');
+            
+            // Determine which player's hand to show
+            let handToShow = game.activePlayer;
+            let handLabel = `Player ${game.activePlayer + 1}'s Hand`;
+            
+            // During Mulligan Phase, show current mulligan player's hand
+            if (game.mulliganPhase) {
+                handToShow = game.currentMulliganPlayer;
+                handLabel = `Player ${handToShow + 1}'s Hand (Mulligan)`;
+            }
+            // During Block Step, show defending player's hand
+            else if (game.attackSequence.active && game.attackSequence.currentStep === 'Block') {
+                handToShow = game.attackSequence.defendingPlayer;
+                handLabel = `Player ${handToShow + 1}'s Hand (Defending)`;
+            }
+            
+            // Update hand label
+            handLabelElement.textContent = handLabel;
+            
+            if (game.gameStarted && game.players[handToShow].hand.length > 0) {
+                handCards.innerHTML = game.players[handToShow].hand.map((card, index) => {
+                    const attackZone = card.type === 'Attack' && getCardZone(card) ? 
+                        `<div class="attack-zone ${getCardZone(card).toLowerCase()}" title="Attack: ${getCardZone(card)}">A</div>` : '';
+                    const blockShield = getCardBlock(card) > 0 ? 
+                        `<div class="shield-icon ${getCardBlockZone(card).toLowerCase()}" title="Block: ${getCardBlockZone(card)}">${getCardBlock(card)}</div>` : '';
+                    
+                    // During Mulligan Phase, disable all card playing
+                    let clickHandler = '';
+                    let cardClass = "hand-card unblockable"; // Use unblockable styling to show cards are disabled
+                    
+                    // Only allow card playing if not in mulligan phase
+                    if (!game.mulliganPhase) {
+                        clickHandler = `onclick="playCard(${index})"`;
+                        cardClass = "hand-card";
+                        
+                        // During Block Step, show block options for defending player
+                        if (game.attackSequence.active && 
+                            game.attackSequence.currentStep === 'Block' && 
+                            handToShow === game.attackSequence.defendingPlayer) {
+                        
+                        // During Block Step, defending player can only block, not play cards normally
+                        if (getCardBlock(card) > 0) {
+                            const attackCard = game.attackSequence.currentAttack;
+                            const canBlockThis = canBlock(getCardZone(attackCard), getCardBlockZone(card));
+                            
+                            if (canBlockThis) {
+                                clickHandler = `onclick="attemptBlock(${index})"`;
+                                cardClass = "hand-card blockable";
+                            } else {
+                                // Can't block with this card, so no click action
+                                clickHandler = '';
+                                cardClass = "hand-card unblockable";
+                            }
+                        } else {
+                            // No block value, so no click action during Block Step
+                            clickHandler = '';
+                            cardClass = "hand-card unblockable";
+                        }
+                    }
+                    // During Enhance Step, show enhance options for current enhance player
+                    else if (game.attackSequence.active && 
+                             game.attackSequence.currentStep === 'Enhance' && 
+                             handToShow === game.attackSequence.currentEnhancePlayer) {
+                        
+                        if (card.type === 'Action' && card.enhances && card.enhances.length > 0) {
+                            // Action card with enhance ability
+                            clickHandler = `onclick="playActionEnhance(${index})"`;
+                            cardClass = "hand-card enhanceable";
+                        } else if (card.type === 'Foundation' && card.enhances && card.enhances.length > 0) {
+                            // Foundation with enhance ability (handled by existing foundation enhance system)
+                            // Keep normal playCard click handler
+                        }
+                    }
+                    } // Close the if (!game.mulliganPhase) statement
+                    
+                    // Show enhance and response abilities
+                    let abilityText = '';
+                    if (card.enhances && card.enhances.length > 0) {
+                        abilityText += `<div style="font-size: 8px; color: #f39c12;">${card.enhances[0]}</div>`;
+                    }
+                    if (card.responses && card.responses.length > 0) {
+                        abilityText += `<div style="font-size: 8px; color: #e74c3c;">${card.responses[0]}</div>`;
+                    }
+                    
+                    // Add card image if available
+                    const cardImage = `<img src="${getImageUrl(card)}" alt="${card.name}" class="hand-card-image" onerror="this.style.display='none'">`;
+                    
+                    // Add preview click handler (right-click or middle-click)
+                    const previewHandler = `oncontextmenu="showCardPreview(${JSON.stringify(card).replace(/"/g, '&quot;')}); return false;" onmouseup="if(event.button === 1) { showCardPreview(${JSON.stringify(card).replace(/"/g, '&quot;')}); return false; }"`;
+                    
+                    return `<div class="${cardClass}" ${clickHandler} ${previewHandler}>
+                        ${cardImage}
+                    </div>`;
+                }).join('');
             } else if (game.gameStarted) {
                 handCards.innerHTML = '<div style="color: #666;">Click "Draw Cards" to draw your hand</div>';
             } else {
@@ -633,6 +1955,7 @@
                     if (cardCount > 0) {
                         // Show only the top card of the deck
                         zoneElement.innerHTML = `<div class="card face-down">
+                            <div class="card-back"></div>
                             <div class="card-name">Deck</div>
                             <div class="card-type">${cardCount} cards</div>
                         </div>`;
@@ -648,9 +1971,28 @@
                     if (cardCount > 0) {
                         // Show only the top card of the discard pile
                         const topCard = cards[cards.length - 1];
-                        zoneElement.innerHTML = `<div class="card">
+                        const cardImage = `<img src="${getImageUrl(topCard)}" alt="${topCard.name}" class="card-image" onerror="this.style.display='none'">`;
+                        const previewHandler = `oncontextmenu="showCardPreview(${JSON.stringify(topCard).replace(/"/g, '&quot;')}); return false;" onmouseup="if(event.button === 1) { showCardPreview(${JSON.stringify(topCard).replace(/"/g, '&quot;')}); return false; }"`;
+                        zoneElement.innerHTML = `<div class="card" ${previewHandler}>
+                            ${cardImage}
                             <div class="card-name">${topCard.name}</div>
                             <div class="card-type">${topCard.type}</div>
+                        </div>`;
+                    } else {
+                        zoneElement.innerHTML = '';
+                    }
+                    return;
+                }
+                
+                // Special handling for momentum zone - show only top card as face-down
+                if (zoneId.includes('momentum')) {
+                    const cardCount = cards.length;
+                    if (cardCount > 0) {
+                        // Show only the top card of the momentum pile
+                        zoneElement.innerHTML = `<div class="card face-down">
+                            <div class="card-back"></div>
+                            <div class="card-name">Momentum</div>
+                            <div class="card-type">${cardCount} cards</div>
                         </div>`;
                     } else {
                         zoneElement.innerHTML = '';
@@ -668,16 +2010,508 @@
                         cardStyle = 'transform: rotate(90deg); opacity: 0.7;';
                     }
                     
-                    return `<div class="${cardClass}" style="${cardStyle}" ${showCommitted ? `onclick="commitFoundation(${index})"` : ''}>
-                        <div class="card-name">${card.name}</div>
-                        <div class="card-type">${card.type}</div>
+                    // Handle foundation clicking - either for committing or enhancing
+                    let clickHandler = '';
+                    if (showCommitted && zoneId.includes('foundations')) {
+                        const playerIndex = zoneId.includes('p1-foundations') ? 0 : 1;
+                        const isCurrentEnhancePlayer = game.attackSequence.active && 
+                                                     game.attackSequence.currentStep === 'Enhance' && 
+                                                     game.attackSequence.currentEnhancePlayer === playerIndex;
+                        
+                        if (isCurrentEnhancePlayer && !card.committed && card.enhances && card.enhances.length > 0) {
+                            // During enhance step, click to use enhance
+                            clickHandler = `onclick="useFoundationEnhance(${playerIndex}, ${index})"`;
+                        } else if (playerIndex === game.activePlayer) {
+                            // Normal gameplay, click to commit/uncommit
+                            clickHandler = `onclick="commitFoundation(${index})"`;
+                        }
+                    }
+                    
+                    // Handle card pool clicking for enhance activation (only attacks and actions)
+                    if (zoneId.includes('cardpool')) {
+                        const playerIndex = zoneId.includes('p1-cardpool') ? 0 : 1;
+                        const isCurrentEnhancePlayer = game.attackSequence.active && 
+                                                     game.attackSequence.currentStep === 'Enhance' && 
+                                                     game.attackSequence.currentEnhancePlayer === playerIndex;
+                        
+                        if (isCurrentEnhancePlayer && card.enhances && card.enhances.length > 0 && 
+                            (card.type === 'Attack' || card.type === 'Action')) {
+                            // During enhance step, click to use enhance from card pool (only attacks and actions)
+                            clickHandler = `onclick="useCardPoolEnhance(${playerIndex}, ${index})"`;
+                        }
+                    }
+                    
+                    // Show enhance abilities on cards that have them
+                    const enhanceText = card.enhances && card.enhances.length > 0 ? 
+                        `<div class="card-enhance">${card.enhances[0]}</div>` : '';
+                    
+                    // Show attack zone indicator for attacks
+                    const attackZone = card.type === 'Attack' && getCardZone(card) ? 
+                        `<div class="attack-zone ${getCardZone(card).toLowerCase()}" title="Attack: ${getCardZone(card)}">A</div>` : '';
+                    
+                    // Show block shield if card has block value
+                    const blockShield = getCardBlock(card) > 0 ? 
+                        `<div class="shield-icon ${getCardBlockZone(card).toLowerCase()}" title="Block: ${getCardBlockZone(card)}">${getCardBlock(card)}</div>` : '';
+                    
+                    // For attack cards, show current damage and speed (including modifications)
+                    let attackStats = '';
+                    if (card.type === 'Attack') {
+                        let currentDamage = getCardDamage(card);
+                        let currentSpeed = getCardSpeed(card);
+                        
+                        // Check if this is the current attack in an attack sequence and apply modifications
+                        if (game.attackSequence.active && 
+                            game.attackSequence.currentAttack && 
+                            game.attackSequence.currentAttack.uniqueId === card.uniqueId) {
+                            // Apply any damage modifications from enhances
+                            if (game.attackSequence.damageModifier) {
+                                currentDamage += game.attackSequence.damageModifier;
+                            }
+                            if (game.attackSequence.speedModifier) {
+                                currentSpeed += game.attackSequence.speedModifier;
+                            }
+                        }
+                        
+                        attackStats = `<div class="card-stats">DMG:${currentDamage} SPD:${currentSpeed}</div>`;
+                    }
+                    
+                    // Add card image if available
+                    const cardImage = `<img src="${getImageUrl(card)}" alt="${card.name}" class="card-image" onerror="this.style.display='none'">`;
+                    
+                    // Add preview click handler (right-click or middle-click)
+                    const previewHandler = `oncontextmenu="showCardPreview(${JSON.stringify(card).replace(/"/g, '&quot;')}); return false;" onmouseup="if(event.button === 1) { showCardPreview(${JSON.stringify(card).replace(/"/g, '&quot;')}); return false; }"`;
+                    
+                    return `<div class="${cardClass}" style="${cardStyle}" ${clickHandler} ${previewHandler}>
+                        ${cardImage}
+                        ${enhanceText}
+                        ${attackZone}
+                        ${blockShield}
+                        ${attackStats}
                     </div>`;
                 }).join('');
             }
         }
 
+        function mulligan() {
+            if (!game.gameStarted || !game.mulliganPhase) {
+                alert('No mulligan phase active!');
+                return;
+            }
+            
+            const currentPlayer = game.players[game.currentMulliganPlayer];
+            
+            if (currentPlayer.mulliganUsed) {
+                alert(`Player ${game.currentMulliganPlayer + 1} has already used their mulligan!`);
+                return;
+            }
+            
+            // Put current hand on bottom of deck
+            currentPlayer.deck.push(...currentPlayer.hand);
+            currentPlayer.hand = [];
+            
+            // Shuffle the deck
+            for (let i = currentPlayer.deck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [currentPlayer.deck[i], currentPlayer.deck[j]] = [currentPlayer.deck[j], currentPlayer.deck[i]];
+            }
+            
+            // Draw new hand
+            for (let i = 0; i < currentPlayer.handSize && currentPlayer.deck.length > 0; i++) {
+                const card = currentPlayer.deck.pop();
+                currentPlayer.hand.push(card);
+            }
+            
+            currentPlayer.mulliganUsed = true;
+            
+            alert(`Player ${game.currentMulliganPlayer + 1} mulliganed! New hand drawn.`);
+            
+            // Move to next player or end mulligan phase
+            game.currentMulliganPlayer++;
+            
+            if (game.currentMulliganPlayer >= 2) {
+                // Both players have had their mulligan opportunity
+                game.mulliganPhase = false;
+                document.getElementById('mulligan-btn').style.display = 'none';
+                document.getElementById('keep-hand-btn').style.display = 'none';
+                updateDisplay();
+                alert('Mulligan phase complete! Game begins. First player skips Start Phase on their first turn.');
+            } else {
+                // Update buttons for next player
+                document.getElementById('mulligan-btn').textContent = `Player ${game.currentMulliganPlayer + 1} - Mulligan`;
+                document.getElementById('keep-hand-btn').textContent = `Player ${game.currentMulliganPlayer + 1} - Keep Hand`;
+                updateDisplay();
+                alert(`Player ${game.currentMulliganPlayer + 1} may now mulligan or keep their hand.`);
+            }
+        }
+        
+        function keepHand() {
+            if (!game.gameStarted || !game.mulliganPhase) {
+                alert('No mulligan phase active!');
+                return;
+            }
+            
+            const currentPlayer = game.players[game.currentMulliganPlayer];
+            
+            if (currentPlayer.mulliganUsed) {
+                alert(`Player ${game.currentMulliganPlayer + 1} has already made their mulligan decision!`);
+                return;
+            }
+            
+            currentPlayer.mulliganUsed = true;
+            
+            alert(`Player ${game.currentMulliganPlayer + 1} kept their hand.`);
+            
+            // Move to next player or end mulligan phase
+            game.currentMulliganPlayer++;
+            
+            if (game.currentMulliganPlayer >= 2) {
+                // Both players have had their mulligan opportunity
+                game.mulliganPhase = false;
+                document.getElementById('mulligan-btn').style.display = 'none';
+                document.getElementById('keep-hand-btn').style.display = 'none';
+                updateDisplay();
+                alert('Mulligan phase complete! Game begins. First player skips Start Phase on their first turn.');
+            } else {
+                // Update buttons for next player
+                document.getElementById('mulligan-btn').textContent = `Player ${game.currentMulliganPlayer + 1} - Mulligan`;
+                document.getElementById('keep-hand-btn').textContent = `Player ${game.currentMulliganPlayer + 1} - Keep Hand`;
+                updateDisplay();
+                alert(`Player ${game.currentMulliganPlayer + 1} may now mulligan or keep their hand.`);
+            }
+        }
+        
+        function playActionEnhance(cardIndex) {
+            if (!game.attackSequence.active || game.attackSequence.currentStep !== 'Enhance') {
+                alert('No enhance step active!');
+                return;
+            }
+            
+            const currentPlayer = game.attackSequence.currentEnhancePlayer;
+            const player = game.players[currentPlayer];
+            const actionCard = player.hand[cardIndex];
+            
+            if (!actionCard || actionCard.type !== 'Action' || !actionCard.enhances || actionCard.enhances.length === 0) {
+                alert('Invalid action card for enhance!');
+                return;
+            }
+            
+            // Check if player can play the action card (progressive difficulty)
+            const requiredDifficulty = actionCard.difficulty + player.cardPool.length;
+            
+            // Perform check by discarding top card
+            if (player.deck.length === 0) {
+                alert('No cards in deck to check!');
+                return;
+            }
+            
+            const checkCard = player.deck.pop();
+            player.discard.push(checkCard);
+            
+            if (checkCard.check >= requiredDifficulty) {
+                // Check passes - play the action card
+                player.hand.splice(cardIndex, 1);
+                player.cardPool.push(actionCard);
+                
+                // Apply the enhance effect
+                const enhanceAbility = actionCard.enhances[0];
+                const attack = game.attackSequence.currentAttack;
+                
+                if (enhanceAbility.includes('+3 damage')) {
+                    game.attackSequence.damageModifier += 3;
+                    alert(`Player ${currentPlayer + 1} plays ${actionCard.name}!\n${attack.name} gets +3 damage! (Now ${attack.damage + game.attackSequence.damageModifier} damage)`);
+                } else if (enhanceAbility.includes('+2 speed')) {
+                    game.attackSequence.speedModifier += 2;
+                    alert(`Player ${currentPlayer + 1} plays ${actionCard.name}!\n${attack.name} gets +2 speed! (Now Speed ${attack.speed + game.attackSequence.speedModifier})`);
+                } else if (enhanceAbility.includes('+1 block value')) {
+                    // This would need to be implemented if we track block modifications
+                    alert(`Player ${currentPlayer + 1} plays ${actionCard.name}!\n${attack.name} gets +1 block value!`);
+                }
+                
+                // Switch to other player immediately
+                const previousPlayer = game.attackSequence.currentEnhancePlayer;
+                game.attackSequence.currentEnhancePlayer = (game.attackSequence.currentEnhancePlayer + 1) % 2;
+                game.attackSequence.enhancePasses = 0; // Reset passes
+                
+                updateDisplay();
+                alert(`Player ${previousPlayer + 1} used ${actionCard.name}!\nNow Player ${game.attackSequence.currentEnhancePlayer + 1}'s turn to enhance or pass.`);
+            } else {
+                // Check fails - need foundations to commit
+                const shortfall = requiredDifficulty - checkCard.check;
+                const availableFoundations = player.foundations.filter(f => !f.committed);
+                
+                if (availableFoundations.length >= shortfall) {
+                    // Can commit enough foundations
+                    const foundationsToCommit = availableFoundations.slice(0, shortfall);
+                    foundationsToCommit.forEach(f => f.committed = true);
+                    
+                    // Play the action card
+                    player.hand.splice(cardIndex, 1);
+                    player.cardPool.push(actionCard);
+                    
+                    // Apply the enhance effect
+                    const enhanceAbility = actionCard.enhances[0];
+                    const attack = game.attackSequence.currentAttack;
+                    
+                    if (enhanceAbility.includes('+3 damage')) {
+                        game.attackSequence.damageModifier += 3;
+                        alert(`Player ${currentPlayer + 1} plays ${actionCard.name}!\nCheck failed but committed ${shortfall} foundations. ${attack.name} gets +3 damage!`);
+                    } else if (enhanceAbility.includes('+2 speed')) {
+                        game.attackSequence.speedModifier += 2;
+                        alert(`Player ${currentPlayer + 1} plays ${actionCard.name}!\nCheck failed but committed ${shortfall} foundations. ${attack.name} gets +2 speed!`);
+                    }
+                    
+                    // Switch to other player
+                    const previousPlayer = game.attackSequence.currentEnhancePlayer;
+                    game.attackSequence.currentEnhancePlayer = (game.attackSequence.currentEnhancePlayer + 1) % 2;
+                    game.attackSequence.enhancePasses = 0;
+                    
+                    updateDisplay();
+                    alert(`Player ${previousPlayer + 1} used ${actionCard.name}!\nNow Player ${game.attackSequence.currentEnhancePlayer + 1}'s turn to enhance or pass.`);
+                } else {
+                    // Cannot play the action card
+                    alert(`Check failed! ${checkCard.name} (${checkCard.check}) < ${requiredDifficulty}. Need ${shortfall} foundations but only have ${availableFoundations.length} available. ${actionCard.name} cannot be played!`);
+                    updateDisplay();
+                }
+            }
+        }
+        
+        // Health Display Functions
+        function updateHealthDisplay() {
+            // Update health for both players
+            game.players.forEach((player, index) => {
+                const playerNumber = index + 1;
+                const healthNumbers = document.querySelectorAll(`#player${playerNumber} .health-number`);
+                
+                healthNumbers.forEach(healthDiv => {
+                    const healthValue = parseInt(healthDiv.getAttribute('data-health'));
+                    healthDiv.classList.remove('active');
+                    
+                    // Highlight the current health value
+                    if (healthValue === player.health) {
+                        healthDiv.classList.add('active');
+                    }
+                });
+            });
+        }
+        
+        function generateHealthDisplay(maxHealth) {
+            let healthHTML = '';
+            for (let i = maxHealth; i >= 0; i--) {
+                healthHTML += `<div class="health-number" data-health="${i}">${i}</div>`;
+            }
+            return healthHTML;
+        }
+        
+        function updateHealthTracker(playerIndex, maxHealth) {
+            const playerNumber = playerIndex + 1;
+            const healthNumbers = document.querySelector(`#player${playerNumber} .health-numbers`);
+            if (healthNumbers) {
+                healthNumbers.innerHTML = generateHealthDisplay(maxHealth);
+            }
+        }
+
+        // Card Preview Functions
+        function showCardPreview(card) {
+            const overlay = document.getElementById('card-preview-overlay');
+            const image = document.getElementById('card-preview-image');
+            
+            if (card && card.image) {
+                image.src = getImageUrl(card);
+                overlay.classList.add('show');
+            }
+        }
+        
+        function closeCardPreview() {
+            const overlay = document.getElementById('card-preview-overlay');
+            overlay.classList.remove('show');
+        }
+        
+        // Close overlay when clicking outside the image
+        document.addEventListener('click', function(event) {
+            const overlay = document.getElementById('card-preview-overlay');
+            const image = document.getElementById('card-preview-image');
+            
+            if (event.target === overlay && !image.contains(event.target)) {
+                closeCardPreview();
+            }
+        });
+        
+        // Close overlay with Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeCardPreview();
+            }
+        });
+
+        // Ability System Integration Functions
+        function checkEnhanceAbilities() {
+            if (typeof abilitySystem === 'undefined') {
+                console.log('Ability system not loaded');
+                return;
+            }
+            
+            const currentPlayer = game.currentPlayer;
+            const opportunities = abilitySystem.checkForEnhanceOpportunities(game, currentPlayer);
+            
+            if (opportunities.length > 0) {
+                console.log('Enhance opportunities found:', opportunities);
+                displayAbilities(opportunities);
+                return opportunities;
+            } else {
+                alert('No enhance opportunities available');
+                return [];
+            }
+        }
+        
+        function displayAbilities(opportunities) {
+            const abilityDisplay = document.getElementById('ability-display');
+            const abilityList = document.getElementById('ability-list');
+            
+            abilityDisplay.style.display = 'block';
+            abilityList.innerHTML = '';
+            
+            opportunities.forEach((opportunity, index) => {
+                const card = opportunity.card;
+                const enhances = opportunity.enhances;
+                
+                enhances.forEach((enhance, enhanceIndex) => {
+                    const abilityItem = document.createElement('div');
+                    abilityItem.className = 'ability-item enhance';
+                    abilityItem.onclick = () => executeEnhance(card, enhance, opportunity.location);
+                    
+                    let abilityText = `<strong>${card.name}</strong> (${opportunity.location})<br>`;
+                    
+                    if (enhance.cost) {
+                        abilityText += `<span class="ability-cost">Cost: ${enhance.cost}</span>`;
+                    }
+                    
+                    if (enhance.condition) {
+                        abilityText += `<span class="ability-condition">Condition: ${enhance.condition}</span>`;
+                    }
+                    
+                    abilityText += `<span class="ability-effect">Effect: ${enhance.effect}</span>`;
+                    
+                    abilityItem.innerHTML = abilityText;
+                    abilityList.appendChild(abilityItem);
+                });
+            });
+        }
+        
+        function executeEnhance(card, enhance, location) {
+            if (typeof abilitySystem === 'undefined') {
+                console.log('Ability system not loaded');
+                return;
+            }
+            
+            const currentPlayer = game.currentPlayer;
+            
+            // Check if we can pay the cost
+            if (enhance.cost && !abilitySystem.canPayCost(enhance.cost, game, currentPlayer)) {
+                alert(`Cannot pay the cost: ${enhance.cost}`);
+                return;
+            }
+            
+            // Check if condition is met
+            if (enhance.condition && !abilitySystem.checkCondition(enhance.condition, game, currentPlayer)) {
+                alert(`Condition not met: ${enhance.condition}`);
+                return;
+            }
+            
+            // Execute the effect
+            abilitySystem.executeEnhanceEffect(enhance.effect, game, currentPlayer);
+            
+            // Hide ability display
+            document.getElementById('ability-display').style.display = 'none';
+            
+            // Update display
+            updateDisplay();
+            
+            alert(`Enhance executed: ${enhance.effect}`);
+        }
+        
+        function passAbility() {
+            document.getElementById('ability-display').style.display = 'none';
+            alert('Ability passed');
+        }
+        
+        function checkResponseAbilities(triggerEvent) {
+            if (typeof abilitySystem === 'undefined') {
+                console.log('Ability system not loaded');
+                return;
+            }
+            
+            const responses = abilitySystem.checkForResponseTriggers(game, triggerEvent);
+            
+            if (responses.length > 0) {
+                console.log('Response triggers found:', responses);
+                displayResponseAbilities(responses);
+                return responses;
+            }
+            
+            return [];
+        }
+        
+        function displayResponseAbilities(responses) {
+            const abilityDisplay = document.getElementById('ability-display');
+            const abilityList = document.getElementById('ability-list');
+            
+            abilityDisplay.style.display = 'block';
+            abilityList.innerHTML = '<h4>Response Abilities Available</h4>';
+            
+            responses.forEach((response, index) => {
+                const card = response.card;
+                const responseAbility = response.response;
+                const playerIndex = response.playerIndex;
+                
+                const abilityItem = document.createElement('div');
+                abilityItem.className = 'ability-item response';
+                abilityItem.onclick = () => executeResponse(card, responseAbility, playerIndex);
+                
+                let abilityText = `<strong>${card.name}</strong> (Player ${playerIndex + 1})<br>`;
+                abilityText += `<span class="ability-condition">Trigger: ${responseAbility.trigger}</span>`;
+                abilityText += `<span class="ability-effect">Effect: ${responseAbility.effect}</span>`;
+                
+                abilityItem.innerHTML = abilityText;
+                abilityList.appendChild(abilityItem);
+            });
+        }
+        
+        function executeResponse(card, response, playerIndex) {
+            if (typeof abilitySystem === 'undefined') {
+                console.log('Ability system not loaded');
+                return;
+            }
+            
+            // Execute the response effect
+            abilitySystem.executeEnhanceEffect(response.effect, game, playerIndex);
+            
+            // Hide ability display
+            document.getElementById('ability-display').style.display = 'none';
+            
+            // Update display
+            updateDisplay();
+            
+            alert(`Response executed: ${response.effect}`);
+        }
+
+
+
         // Initialize
-        updateDisplay();
+        function initGame() {
+            // Check if game data is loaded
+            if (typeof GAME_DATA === 'undefined') {
+                console.error('❌ GAME_DATA not loaded! Check if game_startup_with_abilities.js is loading properly.');
+                alert('Game data not loaded! Please refresh the page or check the console for errors.');
+                return;
+            }
+            
+            // Game data is already loaded in GAME_DATA variable
+            console.log('🎮 UVS Game initialized with:', GAME_DATA.character.name);
+            updateDisplay();
+        }
+        
+        // Start the game when page loads
+        initGame();
     </script>
 </body>
 </html>
